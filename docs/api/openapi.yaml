@@ -1,0 +1,293 @@
+openapi: 3.0.3
+info:
+  title: ConsentBridge Gateway API
+  version: v0.1
+  description: |
+    Minimal HTTP surface for the EU consent-first apply gateway.
+    This API lets trusted agents obtain consent and submit signed applications.
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+
+  /v1/consents:
+    post:
+      summary: Create a consent intent (demo simplified)
+      operationId: createConsent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConsentRequest'
+      responses:
+        '200':
+          description: Consent created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateConsentResponse'
+
+  /v1/consents/{id}/revoke:
+    post:
+      summary: Revoke an active consent
+      operationId: revokeConsent
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Revoked
+        '404':
+          description: Consent not found
+
+  /v1/applications:
+    post:
+      summary: Submit a **detached‑JWS** signed application payload
+      operationId: submitApplication
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: header
+          name: X-JWS-Signature
+          required: true
+          description: Detached JWS signature over the canonical ApplyPayload
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyPayload'
+      responses:
+        '202':
+          description: Accepted; processing async or already forwarded to board/ATS
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitApplicationAccepted'
+        '401':
+          description: Invalid or missing consent token/signature
+        '403':
+          description: Consent not active, expired, or board not allowed
+        '502':
+          description: Upstream adapter error
+
+  /v1/applications/{id}:
+    get:
+      summary: Get application status by id
+      operationId: getApplication
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Application record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationRecord'
+        '404':
+          description: Not found
+
+  /.well-known/jwks.json:
+    get:
+      summary: Platform JWKS (planned)
+      responses:
+        '200':
+          description: JSON Web Key Set
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    CreateConsentRequest:
+      type: object
+      required: [CandidateEmail, AgentTenantId, BoardTenantId]
+      properties:
+        CandidateEmail:
+          type: string
+          format: email
+        AgentTenantId:
+          type: string
+        BoardTenantId:
+          type: string
+
+    CreateConsentResponse:
+      type: object
+      properties:
+        consent_token:
+          type: string
+          example: ctok:3fa85f64-5717-4562-b3fc-2c963f66afa6
+        consent_id:
+          type: string
+          format: uuid
+
+    ApplyPayload:
+      type: object
+      required: [ConsentToken, Candidate, Job, Materials, Meta]
+      properties:
+        ConsentToken:
+          type: string
+          description: Consent token JWT (demo uses ctok:UUID)
+        Candidate:
+          $ref: '#/components/schemas/Candidate'
+        Job:
+          $ref: '#/components/schemas/JobRef'
+        Materials:
+          $ref: '#/components/schemas/Materials'
+        Meta:
+          $ref: '#/components/schemas/Meta'
+
+    Candidate:
+      type: object
+      required: [Id, Contact, Pii, Cv]
+      properties:
+        Id:
+          type: string
+        Contact:
+          $ref: '#/components/schemas/Contact'
+        Pii:
+          $ref: '#/components/schemas/Pii'
+        Cv:
+          $ref: '#/components/schemas/Document'
+
+    Contact:
+      type: object
+      required: [Email]
+      properties:
+        Email:
+          type: string
+          format: email
+        Phone:
+          type: string
+          nullable: true
+
+    Pii:
+      type: object
+      required: [FirstName, LastName]
+      properties:
+        FirstName:
+          type: string
+        LastName:
+          type: string
+
+    Document:
+      type: object
+      required: [Url, Sha256]
+      properties:
+        Url:
+          type: string
+          format: uri
+        Sha256:
+          type: string
+          description: Hex-encoded SHA-256 of the document
+
+    JobRef:
+      type: object
+      required: [ExternalId, Title, Company, ApplyEndpoint]
+      properties:
+        ExternalId:
+          type: string
+        Title:
+          type: string
+        Company:
+          type: string
+        ApplyEndpoint:
+          type: string
+          description: e.g., quick-apply
+
+    Materials:
+      type: object
+      required: [CoverLetter, Answers]
+      properties:
+        CoverLetter:
+          $ref: '#/components/schemas/CoverLetter'
+        Answers:
+          type: array
+          items:
+            $ref: '#/components/schemas/Answer'
+
+    CoverLetter:
+      type: object
+      required: [Text]
+      properties:
+        Text:
+          type: string
+
+    Answer:
+      type: object
+      required: [QuestionId, AnswerText]
+      properties:
+        QuestionId:
+          type: string
+        AnswerText:
+          type: string
+
+    Meta:
+      type: object
+      required: [Locale, UserAgent, Ts]
+      properties:
+        Locale:
+          type: string
+          example: de-DE
+        UserAgent:
+          type: string
+        Ts:
+          type: string
+          format: date-time
+
+    SubmitApplicationAccepted:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [Pending, Accepted, Failed]
+
+    ApplicationRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        consentId:
+          type: string
+          format: uuid
+        agentTenantId:
+          type: string
+        boardTenantId:
+          type: string
+        status:
+          type: string
+          enum: [Pending, Accepted, Failed]
+        submittedAt:
+          type: string
+          format: date-time
+        receipt:
+          type: string
+          nullable: true
+        payloadHash:
+          type: string
