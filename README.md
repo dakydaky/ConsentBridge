@@ -50,8 +50,6 @@ consentbridge/
    └─ scripts/
 ```
 
-> This README reflects the **original solution layout** (C#/.NET 9). If you’re using the demo scaffold, directories may be a subset while we iterate toward this structure.
-
 ---
 
 ## 🗺️ Architecture (at a glance)
