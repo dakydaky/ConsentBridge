@@ -98,9 +98,10 @@ Use Swagger to back up compliance talking points:
 3. **🔑 Public key transparency**
    - `GET /.well-known/jwks.json`: explain how tenants can verify keys before trusting receipts.
 
-4. **🗑️ Data subject rights (roadmap)**
-   - Point out TODO entries mentioning DSR export/delete endpoints and retention automation.
-
+4. **🗑️ Data subject rights**
+   - `POST /v1/dsr/export` – walk through the JSON package returned for consents, applications, and consent requests.
+   - `POST /v1/dsr/delete` – show the `confirm` flag, deletion counters, and the tenant scoping rules.
+   - Automated retention: receipts older than 12 months return with `receipt` stripped; consent requests older than 90 days are removed automatically.
 5. **🛡️ Next steps**
    - Mention planned key rotation tooling and JWKS hosting in production to bolster compliance posture.
 

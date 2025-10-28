@@ -38,17 +38,17 @@ The system intentionally stores only hashes and canonical payloads needed for pr
 The platform is being shaped to satisfy core GDPR obligations:
 
 - **Lawful basis & consent:** Consent requests capture explicit approval before processing applications.
-- **Data minimisation:** Gateway retains only canonical payloads, hashes, and signatures required for provenance. Specs call for automatic deletion of raw payloads after short retention windows.
+- **Data minimisation:** Gateway retains only canonical payloads, hashes, and signatures required for provenance. A scheduled retention sweep clears receipt payloads after 12 months and prunes stale consent requests after 90 days.
 - **Integrity & confidentiality:** Signatures ensure that only authorised tenants can submit or acknowledge applications; persisted hashes allow detection of modification.
 - **Accountability:** Storing the submission `kid`, algorithm, and receipt proofs enables audit trails that regulators expect. Additional logging and immutable audit stores are still TODO.
-- **Data subject rights:** Export/delete (DSR) endpoints allow tenants to retrieve or purge candidate data on demand; retention automation remains a roadmap item.
+- **Data subject rights:** Export/delete (DSR) endpoints allow tenants to retrieve or purge candidate data on demand; retention sweeps keep residual payloads within policy windows.
 
 > **Important:** These mechanisms align with GDPR principles, but the current demo is not a certified compliance solution. Production readiness requires operational controls (key rotation, monitoring, documented lawful bases, DPIAs) and completion of outstanding features (DSR automation, secure JWKS distribution, audit trails, infrastructure hardening).
 
 ## 4. Recommended Next Steps
 
 1. **JWKS service:** Serve tenant keys via authenticated HTTPS and add caching/refresh logic.
-2. **DSR reporting:** Add SLA tracking, notification hooks, and retention automation on top of the new export/delete workflow.
+2. **DSR reporting:** Add SLA tracking, notification hooks, and richer retention dashboards on top of the export/delete and cleanup workflow.
 3. **Key rotation & revocation:** Provide tooling to rotate keys and reject obsolete signatures.
 4. **Audit trails:** Append-only storage (e.g., event logs) linking signature metadata to human-readable audits.
 5. **Documentation:** Update SDP/DPAs once the above controls exist; engage privacy counsel for formal compliance posture.

@@ -175,10 +175,10 @@ curl -s -X POST http://localhost:8080/v1/dsr/delete \
 ---
 
 ## 📦 Features (MVP)
+- **DSR tooling** – export/delete endpoints, automated retention cleanup
 - **Consent UI & tokens** (OAuth‑style) with **revocation**
 - **Signed ApplyPayloads** (ES256/EdDSA) & **signed receipts**
 - **Evidence**: audit trail, payload hashes, timestamps
-- **DSR**: export & delete endpoints
 - **SDKs**: .NET (more to come)
 
 ---
@@ -197,7 +197,7 @@ curl -s -X POST http://localhost:8080/v1/dsr/delete \
 ## 🔐 GDPR & Privacy
 - **Explicit consent** with scopes and expiry
 - **Revocation** takes effect immediately for new applies
-- **Data minimization** & short retention for raw payloads
+- **Data minimization** & scheduled retention sweeps (raw receipts cleared after 12 months, consent requests pruned after 90 days)
 - **DSR** endpoints (export/delete)
 - **Tenant isolation** & key management (platform + per‑tenant JWKS)
 

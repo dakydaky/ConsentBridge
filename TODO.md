@@ -10,6 +10,7 @@ Consent UX & Auth
 - ✅ Real Signature Handling – Gateway validates ES256 detached JWS via tenant JWKS (config-backed for demo) and stores submission signature metadata for audit trails.
 - ✅ Receipts & Provenance – Signed receipt contract in place (MockBoard signing, gateway verifies & stores hash/signature) with `/applications/{id}` portal view rendering provenance payload.
 Data & Compliance
+✅ Retention sweeps – automated removal of aged consent requests and receipt payloads with configurable windows
 
 Migrations & Seed Data – Formalize EF migrations (already scaffolded) and add seed scripts for demo tenants; include automated dotnet ef database update in container startup once pending-model-changes are eliminated.
 ✅ DSR Endpoints – Export/delete APIs in place; follow-up retention automation and SLA tracking remain outstanding.

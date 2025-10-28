@@ -22,6 +22,9 @@ public static class InfrastructureServices
         services.AddSingleton<IClientSecretHasher, DefaultClientSecretHasher>();
         services.AddSingleton<IConsentTokenFactory>(new DemoConsentTokenFactory());
         services.AddScoped<IDsrService, DsrService>();
+        services.Configure<RetentionOptions>(configuration.GetSection("Retention"));
+        services.AddScoped<DataRetentionExecutor>();
+        services.AddHostedService<RetentionCleanupBackgroundService>();
 
         services.AddSingleton<IAccessTokenFactory, JwtAccessTokenFactory>();
         services.PostConfigure<JwtAccessTokenOptions>(options =>
