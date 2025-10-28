@@ -44,7 +44,7 @@ Goal: Replace the direct `POST /v1/consents` call with a minimal browser experie
 - Store hashed codes with short TTL.
 
 ## Considerations
-- Maintain audit trail: every decision stored (new `ConsentAudit` entries).
+- Maintain audit trail: every decision stored via `audit_events` with hash chaining per ADR 0003.
 - Prevent reuse: once decision recorded, disable link.
 - Security: signed consent token should embed `TokenId`, `tenant info`, `expires`.
 - Internationalization: keep strings centralized for later localization.

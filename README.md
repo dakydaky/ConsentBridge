@@ -35,7 +35,7 @@ consentbridge/
 │  ├─ Gateway.Api/                 # ASP.NET Core Minimal APIs + OpenAPI
 │  ├─ Gateway.Domain/             # Entities, Value Objects, Policies
 │  ├─ Gateway.Application/        # Use-cases, Handlers, Service interfaces
-│  ├─ Gateway.Infrastructure/     # EF Core, Postgres, Key Vault, Email
+│  ├─ Gateway.Infrastructure/     # EF Core, Postgres, secrets, Email
 │  ├─ Gateway.CertAuthority/      # JWK/JWT issuing, key rotation jobs
 │  ├─ Gateway.Sdk.DotNet/         # Partner SDK (client + models + signing)
 │  └─ Gateway.Test/               # Unit/integration tests
@@ -103,14 +103,14 @@ REQUEST_ID=$(curl -s -X POST http://localhost:8080/v1/consent-requests \
 echo "Consent request ID: $REQUEST_ID"
 ```
 
-Check the API logs for the one-time code (OTP) that is logged for demo purposes, then open `http://localhost:8080/consent/$REQUEST_ID`, enter the OTP, and approve the request. Copy the consent token shown on the success screen (`TOKEN`).
+Check the API logs for the one-time code (OTP) that is logged for demo purposes, then open `http://localhost:8080/consent/$REQUEST_ID`, enter the OTP, and approve the request. Copy the consent token shown on the success screen (`TOKEN`). The page now returns a JWT (per ADR 0002); demo builds may still emit `ctok:` GUIDs while migration is in flight.
 
 ### 5) Submit a (signed) application
 1. Save the payload you want to send (update `ConsentToken` and other fields as needed).
    ```bash
    cat <<'EOF' > payload.json
    {
-     "ConsentToken": "ctok:REPLACE_WITH_TOKEN_FROM_WEB",
+     "ConsentToken": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.REPLACE_WITH_TOKEN_BODY.SIGNATURE",
      "Candidate": {
        "Id": "cand_123",
        "Contact": {"Email": "alice@example.com", "Phone": "+45 1234"},
