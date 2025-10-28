@@ -133,7 +133,8 @@ Check the API logs for the one-time code (OTP) that is logged for demo purposes,
    ```
 2. Generate the detached JWS signature.
    ```powershell
-   $signature = (pwsh ./demo.ps1 -PayloadPath payload.json -Kid agent_acme -Secret agent-signing-secret | Select-Object -Last 1)
+   $signature = (pwsh ./demo.ps1 -PayloadPath payload.json | Select-Object -Last 1)
+   # Uses certs/agent_acme_private.jwk.json by default; override with -PrivateJwkPath if keys rotate
    ```
 3. Send the application.
    ```bash
@@ -215,7 +216,8 @@ dotnet ef database update \
 ---
 
 ## 🗺️ Roadmap
-- [ ] Real JWS verification (ES256/EdDSA) + JWKS endpoint
+- [x] ES256 detached-JWS verification via tenant JWKS
+- [ ] Publish tenant JWKS endpoint
 - [ ] Client credentials auth per tenant
 - [ ] Signed receipts verifier & provenance card for recruiters
 - [ ] Candidate portal (consent dashboard, DSR)

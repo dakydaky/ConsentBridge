@@ -39,6 +39,10 @@ var payloadSerializerOptions = new JsonSerializerOptions(JsonSerializerDefaults.
 {
     WriteIndented = false
 };
+var jwsHeaderSerializerOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+{
+    PropertyNameCaseInsensitive = true
+};
 
 // Http client for the MockBoard adapter
 builder.Services.AddHttpClient("mockboard", client =>
@@ -271,6 +275,10 @@ app.MapPost("/v1/applications", async (
     }
 
     var payloadBytes = JsonSerializer.SerializeToUtf8Bytes(payload, payloadSerializerOptions);
+    if (!TryParseDetachedJws(jws, payloadBytes, out var submissionHeader))
+    {
+        return Results.BadRequest(new { error = "invalid_signature" });
+    }
     if (!verifier.VerifyDetached(payloadBytes, jws, consent.AgentTenantId))
     {
         return Results.BadRequest(new { error = "invalid_signature" });
@@ -286,6 +294,9 @@ app.MapPost("/v1/applications", async (
         BoardTenantId = consent.BoardTenantId,
         Status = ApplicationStatus.Pending,
         SubmittedAt = DateTime.UtcNow,
+        SubmissionSignature = jws,
+        SubmissionKeyId = submissionHeader.Kid,
+        SubmissionAlgorithm = submissionHeader.Alg,
         PayloadHash = payloadHash
     };
     db.Applications.Add(appRec);
@@ -518,6 +529,36 @@ bool HasScope(ClaimsPrincipal user, string scope)
     return false;
 }
 
+bool TryParseDetachedJws(string jws, ReadOnlySpan<byte> canonicalJson, out JwsHeader header)
+{
+    header = default!;
+    var parts = jws.Split('.');
+    if (parts.Length != 3)
+    {
+        return false;
+    }
+
+    var headerEncoded = parts[0];
+    var payloadEncoded = parts[1];
+    var expectedPayload = Base64UrlEncoder.Encode(canonicalJson.ToArray());
+    if (!string.Equals(payloadEncoded, expectedPayload, StringComparison.Ordinal))
+    {
+        return false;
+    }
+
+    try
+    {
+        var headerJson = Encoding.UTF8.GetString(Base64UrlEncoder.DecodeBytes(headerEncoded));
+        header = JsonSerializer.Deserialize<JwsHeader>(headerJson, jwsHeaderSerializerOptions)
+            ?? throw new JsonException("Invalid JWS header.");
+        return !string.IsNullOrWhiteSpace(header.Alg);
+    }
+    catch
+    {
+        return false;
+    }
+}
+
 ApplicationRecordDto MapApplication(Application application) =>
     new(
         application.Id,
@@ -527,6 +568,9 @@ ApplicationRecordDto MapApplication(Application application) =>
         application.Status,
         application.SubmittedAt,
         application.PayloadHash,
+        application.SubmissionSignature,
+        application.SubmissionKeyId,
+        application.SubmissionAlgorithm,
         application.Receipt,
         application.ReceiptSignature,
         application.ReceiptHash);
@@ -549,4 +593,6 @@ IReadOnlyList<string> SplitScopes(string scopes) =>
     string.IsNullOrWhiteSpace(scopes)
         ? Array.Empty<string>()
         : scopes.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+sealed record JwsHeader(string? Alg, string? Kid, string? Typ);
 

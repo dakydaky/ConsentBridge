@@ -1,0 +1,10 @@
+{
+  "kty": "EC",
+  "crv": "P-256",
+  "kid": "agent-acme-key",
+  "use": "sig",
+  "alg": "ES256",
+  "x": "zSGrqNXiPU7Y0ysTqee9HUp5MMndH2jbmCan4lrtnXs",
+  "y": "v13_e106aIDlrEY_c_Gf3c9gyUcJFYexSA_IRom1r14",
+  "d": "wmmttMOUpAOuQdSEzTsnDNJPFUDj-Xr_F3yIVz_p_pE"
+}

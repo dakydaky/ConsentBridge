@@ -51,7 +51,7 @@ public static class DemoTenantSeeder
                     Slug = cfg.Slug,
                     DisplayName = cfg.DisplayName ?? cfg.Slug,
                     Type = cfg.Type ?? InferTypeFromKey(child.Key),
-                    JwksEndpoint = cfg.JwksEndpoint,
+                    JwksEndpoint = cfg.JwksEndpoint ?? cfg.JwksPath,
                     CallbackUrl = cfg.CallbackUrl,
                     IsActive = true,
                     CreatedAt = now,
@@ -64,7 +64,7 @@ public static class DemoTenantSeeder
             {
                 tenant.DisplayName = cfg.DisplayName ?? tenant.DisplayName;
                 tenant.Type = cfg.Type ?? tenant.Type;
-                tenant.JwksEndpoint = cfg.JwksEndpoint;
+                tenant.JwksEndpoint = cfg.JwksEndpoint ?? cfg.JwksPath ?? tenant.JwksEndpoint;
                 tenant.CallbackUrl = cfg.CallbackUrl;
                 tenant.IsActive = true;
                 tenant.UpdatedAt = now;
@@ -140,6 +140,6 @@ public static class DemoTenantSeeder
         public string? ClientId { get; set; }
         public string? ClientSecret { get; set; }
         public string[]? Scopes { get; set; }
-        public string? SignatureSecret { get; set; }
+        public string? JwksPath { get; set; }
     }
 }

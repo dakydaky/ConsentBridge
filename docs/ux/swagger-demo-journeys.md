@@ -4,7 +4,7 @@ This note documents the current end-to-end flows we can showcase via Swagger (`h
 
 ---
 
-## Journey A – Agent applies with active consent (current happy path)
+## Journey A - Agent applies with active consent (current happy path)
 
 **Goal**: Show that the gateway can accept an application on behalf of a candidate and persist the outcome while forwarding to the MockBoard adapter.
 
@@ -31,7 +31,7 @@ This note documents the current end-to-end flows we can showcase via Swagger (`h
    - Generate the detached JWS signature (use `demo.ps1` with your payload) and include it as `X-JWS-Signature`.
      - `docs/ux/demo-application-payload.json` contains the sample body below; update `consentToken` with the value from the web approval.
      - Run `pwsh ./demo.ps1 -PayloadPath ./docs/ux/demo-application-payload.json`.
-       The script prints the canonical JSON and the value to copy into the `X-JWS-Signature` header—use that canonical payload as the request body.
+       The script loads the ES256 private key at `certs/agent_acme_private.jwk.json` by default (override with `-PrivateJwkPath` if rotated) and prints the canonical JSON plus the value to copy into the `X-JWS-Signature` header.
    - Endpoint: `POST /v1/applications`
    - Headers: `Authorization: Bearer <token>` and `X-JWS-Signature: detached JWS`
    - Body example (swap in real `consentToken`):
@@ -62,7 +62,7 @@ This note documents the current end-to-end flows we can showcase via Swagger (`h
 
 4. **Review via API**
    - Endpoint: `GET /v1/applications/{id}`
-   - Expected response: `200 OK` with receipt, `receiptSignature`, and `receiptHash` metadata showing the forwarded application.
+   - Expected response: `200 OK` with canonical payload hash, submission metadata (`submissionSignature`, `submissionKeyId`, `submissionAlgorithm`), and the board receipt fields (`receipt`, `receiptSignature`, `receiptHash`).
    - Optional: open `http://localhost:8080/applications/{id}` to see the stored receipt payload and signature in the portal.
 
 ---
@@ -107,7 +107,7 @@ This note documents the current end-to-end flows we can showcase via Swagger (`h
     ```
   - Returned JWT includes claims for tenant slug (`sub`), tenant id, tenant type, client id, and scopes.
   - Enforcement on `/v1/applications` is still pending; note this to viewers.
-  - After receiving the token, click Swagger’s **Authorize** button and paste `Bearer <token>` so subsequent calls include the header automatically.
+  - After receiving the token, click Swagger's **Authorize** button and paste `Bearer <token>` so subsequent calls include the header automatically.
   - **Swagger tip:** send the body as JSON if you cannot set the form URL-encoded content type:
     ```json
     {
@@ -127,9 +127,3 @@ Track progress in:
 - `TODO.md` (Consent UX & Auth section)
 
 Update this file after each milestone to keep product demos and investor walkthroughs consistent.
-
-
-
-
-
-

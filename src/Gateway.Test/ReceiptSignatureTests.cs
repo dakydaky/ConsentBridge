@@ -1,7 +1,10 @@
 using FluentAssertions;
 using Gateway.Domain;
 using Gateway.Infrastructure;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 using MockBoard.Adapter;
 using MockBoard.Adapter.Services;
 
@@ -10,21 +13,15 @@ namespace Gateway.Test;
 public class ReceiptSignatureTests
 {
     private const string BoardSlug = "mockboard_eu";
-    private const string SigningSecret = "board-signing-secret";
 
     [Fact]
     public void ReceiptSignerProducesPayloadThatGatewayVerifierAccepts()
     {
         var payload = CreatePayload();
-        var signer = new ReceiptSigner(new StaticOptions(new MockBoardOptions
-        {
-            BoardId = BoardSlug,
-            SigningSecret = SigningSecret
-        }));
-
+        var signer = CreateSigner();
         var signature = signer.Sign(payload, out var canonical);
 
-        var verifier = new Hs256JwsVerifier(new InMemorySecretProvider(BoardSlug, SigningSecret));
+        var verifier = CreateVerifier();
         verifier.VerifyDetached(canonical, signature, BoardSlug).Should().BeTrue();
     }
 
@@ -32,22 +29,44 @@ public class ReceiptSignatureTests
     public void ReceiptSignatureFailsWhenPayloadIsTampered()
     {
         var payload = CreatePayload();
-        var signer = new ReceiptSigner(new StaticOptions(new MockBoardOptions
-        {
-            BoardId = BoardSlug,
-            SigningSecret = SigningSecret
-        }));
-
+        var signer = CreateSigner();
         var signature = signer.Sign(payload, out var canonical);
 
         var tamperedPayload = payload with { Status = "pending-review" };
         var tamperedBytes = ReceiptJson.SerializePayload(tamperedPayload);
 
-        var verifier = new Hs256JwsVerifier(new InMemorySecretProvider(BoardSlug, SigningSecret));
+        var verifier = CreateVerifier();
         verifier.VerifyDetached(tamperedBytes, signature, BoardSlug).Should().BeFalse();
-
-        // Original payload still verifies
         verifier.VerifyDetached(canonical, signature, BoardSlug).Should().BeTrue();
+    }
+
+    private static ReceiptSigner CreateSigner()
+    {
+        var (mockboardRoot, _) = ResolvePaths();
+        var options = new MockBoardOptions
+        {
+            BoardId = BoardSlug,
+            PrivateJwkPath = Path.Combine(mockboardRoot, "certs", "mockboard_private.jwk.json")
+        };
+        var env = new TestHostEnvironment(mockboardRoot);
+        return new ReceiptSigner(new StaticOptions(options), env);
+    }
+
+    private static IJwsVerifier CreateVerifier()
+    {
+        var (_, gatewayApiRoot) = ResolvePaths();
+        var jwksPath = Path.Combine(gatewayApiRoot, "jwks", "mockboard.jwks.json");
+        var jwksJson = File.ReadAllText(jwksPath);
+        var jwks = new JsonWebKeySet(jwksJson);
+        return new JwksJwsVerifier(new StaticKeyStore(BoardSlug, jwks));
+    }
+
+    private static (string MockBoardRoot, string GatewayApiRoot) ResolvePaths()
+    {
+        var solutionRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../"));
+        var mockBoardRoot = Path.Combine(solutionRoot, "src", "MockBoard.Adapter");
+        var gatewayApiRoot = Path.Combine(solutionRoot, "src", "Gateway.Api");
+        return (mockBoardRoot, gatewayApiRoot);
     }
 
     private static BoardReceiptPayload CreatePayload() =>
@@ -67,27 +86,33 @@ public class ReceiptSignatureTests
         public MockBoardOptions Value { get; }
     }
 
-    private sealed class InMemorySecretProvider : ITenantSigningSecretProvider
+    private sealed class StaticKeyStore : ITenantKeyStore
     {
-        private readonly string _tenantSlug;
-        private readonly string _secret;
+        private readonly Dictionary<string, JsonWebKeySet> _map;
 
-        public InMemorySecretProvider(string tenantSlug, string secret)
+        public StaticKeyStore(string slug, JsonWebKeySet jwks)
         {
-            _tenantSlug = tenantSlug;
-            _secret = secret;
-        }
-
-        public bool TryGetSigningSecret(string tenantSlug, out string? secret)
-        {
-            if (string.Equals(tenantSlug, _tenantSlug, StringComparison.Ordinal))
+            _map = new Dictionary<string, JsonWebKeySet>(StringComparer.Ordinal)
             {
-                secret = _secret;
-                return true;
-            }
-
-            secret = null;
-            return false;
+                [slug] = jwks
+            };
         }
+
+        public bool TryGetKeys(string tenantSlug, out JsonWebKeySet? jwks) =>
+            _map.TryGetValue(tenantSlug, out jwks);
+    }
+
+    private sealed class TestHostEnvironment : IHostEnvironment
+    {
+        public TestHostEnvironment(string contentRoot)
+        {
+            ContentRootPath = contentRoot;
+            ContentRootFileProvider = new PhysicalFileProvider(contentRoot);
+        }
+
+        public string EnvironmentName { get; set; } = "Development";
+        public string ApplicationName { get; set; } = "MockBoard.Adapter";
+        public string ContentRootPath { get; set; }
+        public IFileProvider ContentRootFileProvider { get; set; }
     }
 }

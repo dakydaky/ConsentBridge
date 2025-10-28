@@ -286,6 +286,15 @@ components:
         submittedAt:
           type: string
           format: date-time
+        submissionSignature:
+          type: string
+          nullable: true
+        submissionKeyId:
+          type: string
+          nullable: true
+        submissionAlgorithm:
+          type: string
+          nullable: true
         receipt:
           type: string
           nullable: true

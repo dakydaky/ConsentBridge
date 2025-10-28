@@ -1,0 +1,10 @@
+{
+  "kty": "EC",
+  "crv": "P-256",
+  "kid": "mockboard-key",
+  "use": "sig",
+  "alg": "ES256",
+  "x": "d-WsA_4dxVaJePnlEuXpBEMrKbd60TZtrydkgydpmoI",
+  "y": "Vrx-a2CYL9wCUdDZ3GqM9OQx_SZ97hOFtzC6nhpRYrw",
+  "d": "rV2-Wf2gmZ6q6SvbIqDYYb5t3Cf8Yn0B_jYOcpq7wYA"
+}

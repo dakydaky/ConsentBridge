@@ -45,6 +45,9 @@ public class Application
     public string? Receipt { get; set; }
     public string? ReceiptSignature { get; set; }
     public string? ReceiptHash { get; set; }
+    public string? SubmissionSignature { get; set; }
+    public string? SubmissionKeyId { get; set; }
+    public string? SubmissionAlgorithm { get; set; }
     public string PayloadHash { get; set; } = default!;
 }
 

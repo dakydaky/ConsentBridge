@@ -17,4 +17,10 @@
     <ProjectReference Include="..\Gateway.Domain\Gateway.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="certs\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

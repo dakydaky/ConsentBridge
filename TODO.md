@@ -7,8 +7,8 @@ Consent UX & Auth
 - ✅ Enforce bearer tokens on `/v1/applications` (JWT auth + scope policy).
 - ✅ Deliver consent web flow MVP (OTP verification, Razor pages, consent issuance).
 - Replace `ctok:` demo token with signed JWT + detached-JWS validation per tenant.
-Real Signature Handling – Replace AcceptAllVerifier with ES256/EdDSA detached-JWS validation, plug in tenant JWKS discovery, and persist JWS metadata for audits (docs/spec/whitepaper.md and spec-multi.md call out cryptographic guarantees).
-✅ Receipts & Provenance – Signed receipt contract in place (MockBoard signing, gateway verifies & stores hash/signature) with `/applications/{id}` portal view rendering provenance payload.
+- ✅ Real Signature Handling – Gateway validates ES256 detached JWS via tenant JWKS (config-backed for demo) and stores submission signature metadata for audit trails.
+- ✅ Receipts & Provenance – Signed receipt contract in place (MockBoard signing, gateway verifies & stores hash/signature) with `/applications/{id}` portal view rendering provenance payload.
 Data & Compliance
 
 Migrations & Seed Data – Formalize EF migrations (already scaffolded) and add seed scripts for demo tenants; include automated dotnet ef database update in container startup once pending-model-changes are eliminated.
@@ -25,5 +25,7 @@ SDK & Client Tooling – Flesh out Gateway.Sdk.DotNet with actual HTTP client, s
 Deployment Assets – Replace placeholder .gitkeep charts/manifests with real Helm/K8s manifests, CI pipeline definitions, and update README setup steps accordingly.
 Documentation & Storytelling – Expand README with architecture diagrams, API walkthroughs, and troubleshooting; align Swagger metadata with the published OpenAPI in docs/api/openapi.yaml.
 
-
-\nMockBoard UX\n- [x] Add Razor-based dashboard with recent applies\n- [ ] Surface real payload details (parse JSON)\n- [ ] Signed receipt display & download
+MockBoard UX
+- [x] Add Razor-based dashboard with recent applies
+- [ ] Surface real payload details (parse JSON)
+- [x] Signed receipt viewer (portal renders receipt payload/signature)

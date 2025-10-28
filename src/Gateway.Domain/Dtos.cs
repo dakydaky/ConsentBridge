@@ -46,6 +46,9 @@ public record ApplicationRecordDto(
     ApplicationStatus Status,
     DateTime SubmittedAt,
     string PayloadHash,
+    string? SubmissionSignature,
+    string? SubmissionKeyId,
+    string? SubmissionAlgorithm,
     string? Receipt,
     string? ReceiptSignature,
     string? ReceiptHash);

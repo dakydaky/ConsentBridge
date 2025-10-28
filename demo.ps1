@@ -2,8 +2,8 @@ Param(
     [Parameter(Mandatory = $true)]
     [string]$PayloadPath,
 
-    [string]$Kid = "agent_acme",
-    [string]$Secret = "agent-signing-secret"
+    [string]$PrivateJwkPath = "./certs/agent_acme_private.jwk.json",
+    [string]$Kid
 )
 
 if (-not (Test-Path $PayloadPath)) {
@@ -11,8 +11,23 @@ if (-not (Test-Path $PayloadPath)) {
     exit 1
 }
 
+if (-not (Test-Path $PrivateJwkPath)) {
+    Write-Error "Private JWK file '$PrivateJwkPath' not found."
+    exit 1
+}
+
 function Convert-ToBase64Url([byte[]] $bytes) {
     ([Convert]::ToBase64String($bytes)).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+}
+
+function Convert-FromBase64Url([string] $value) {
+    $padded = $value.Replace('-', '+').Replace('_', '/')
+    switch ($padded.Length % 4) {
+        2 { $padded += '==' }
+        3 { $padded += '=' }
+        1 { $padded += '===' }
+    }
+    [Convert]::FromBase64String($padded)
 }
 
 $payloadJson = Get-Content $PayloadPath -Raw
@@ -22,8 +37,20 @@ $serializerOptions = [System.Text.Json.JsonSerializerOptions]::new([System.Text.
 $serializerOptions.WriteIndented = $false
 $canonicalJson = [System.Text.Json.JsonSerializer]::Serialize($jsonDocument.RootElement, $serializerOptions)
 
+$jwk = Get-Content $PrivateJwkPath -Raw | ConvertFrom-Json
+if (-not $Kid) {
+    $Kid = $jwk.kid
+}
+
+$parameters = [System.Security.Cryptography.ECParameters]::new()
+$parameters.Curve = [System.Security.Cryptography.ECCurve]::CreateFromFriendlyName("nistP256")
+$parameters.Q = [System.Security.Cryptography.ECPoint]::new()
+$parameters.Q.X = Convert-FromBase64Url $jwk.x
+$parameters.Q.Y = Convert-FromBase64Url $jwk.y
+$parameters.D = Convert-FromBase64Url $jwk.d
+
 $header = @{
-    alg = "HS256"
+    alg = "ES256"
     kid = $Kid
     typ = "JOSE"
 } | ConvertTo-Json -Compress
@@ -32,9 +59,10 @@ $headerEncoded = Convert-ToBase64Url([System.Text.Encoding]::UTF8.GetBytes($head
 $payloadEncoded = Convert-ToBase64Url([System.Text.Encoding]::UTF8.GetBytes($canonicalJson))
 
 $signingInput = "$headerEncoded.$payloadEncoded"
-$keyBytes = [System.Text.Encoding]::UTF8.GetBytes($Secret)
-$hmac = [System.Security.Cryptography.HMACSHA256]::new($keyBytes)
-$signatureBytes = $hmac.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($signingInput))
+$ecdsa = [System.Security.Cryptography.ECDsa]::Create()
+$ecdsa.ImportParameters($parameters)
+$signatureBytes = $ecdsa.SignData([System.Text.Encoding]::UTF8.GetBytes($signingInput), [System.Security.Cryptography.HashAlgorithmName]::SHA256)
+$ecdsa.Dispose()
 $signatureEncoded = Convert-ToBase64Url($signatureBytes)
 
 $jws = "$headerEncoded.$payloadEncoded.$signatureEncoded"
