@@ -1,8 +1,11 @@
 using Gateway.Domain;
 using Gateway.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OpenApi;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Primitives;
 using Serilog;
+using System.Linq;
 using System.Net.Http.Json;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,7 +19,7 @@ builder.Host.UseSerilog((ctx, lc) => lc
 // DbContext + infrastructure services
 builder.Services.AddDbContext<GatewayDbContext>(opts =>
     opts.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
-builder.Services.AddGatewayInfrastructure();
+builder.Services.AddGatewayInfrastructure(builder.Configuration);
 
 // Http client for the MockBoard adapter
 builder.Services.AddHttpClient("mockboard", client =>
@@ -36,6 +39,7 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<GatewayDbContext>();
     db.Database.Migrate();
 }
+await DemoTenantSeeder.SeedAsync(app.Services, builder.Configuration);
 
 if (app.Environment.IsDevelopment())
 {
@@ -170,11 +174,73 @@ app.MapPost("/v1/consents/{id:guid}/revoke", async (Guid id, GatewayDbContext db
     return Results.NoContent();
 });
 
-app.MapPost("/oauth/token", () => Results.StatusCode(StatusCodes.Status501NotImplemented))
+app.MapPost("/oauth/token", async (
+    HttpRequest request,
+    GatewayDbContext db,
+    IClientSecretHasher hasher,
+    IAccessTokenFactory tokenFactory) =>
+{
+    if (!request.HasFormContentType)
+    {
+        return Results.Json(new { error = "invalid_request", error_description = "Content-Type must be application/x-www-form-urlencoded" }, statusCode: StatusCodes.Status400BadRequest);
+    }
+
+    var form = await request.ReadFormAsync();
+    var grantType = form["grant_type"].ToString();
+    if (!string.Equals(grantType, "client_credentials", StringComparison.Ordinal))
+    {
+        return Results.Json(new { error = "unsupported_grant_type" }, statusCode: StatusCodes.Status400BadRequest);
+    }
+
+    var clientId = form["client_id"].ToString();
+    var clientSecret = form["client_secret"].ToString();
+    if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret))
+    {
+        return InvalidClient();
+    }
+
+    var credential = await db.TenantCredentials
+        .Include(c => c.Tenant)
+        .FirstOrDefaultAsync(c => c.ClientId == clientId);
+    if (credential?.Tenant is null || !credential.IsActive || !credential.Tenant.IsActive)
+    {
+        return InvalidClient();
+    }
+
+    if (!hasher.Verify(clientSecret, credential.ClientSecretHash))
+    {
+        return InvalidClient();
+    }
+
+    var allowedScopes = credential.Scopes.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    var requestedScopes = form.TryGetValue("scope", out var scopeValue) && !StringValues.IsNullOrEmpty(scopeValue)
+        ? scopeValue.ToString().Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        : Array.Empty<string>();
+
+    if (requestedScopes.Length > 0 && requestedScopes.Except(allowedScopes, StringComparer.Ordinal).Any())
+    {
+        return Results.Json(new { error = "invalid_scope" }, statusCode: StatusCodes.Status400BadRequest);
+    }
+
+    var effectiveScopes = requestedScopes.Length > 0 ? requestedScopes : allowedScopes;
+    var token = tokenFactory.IssueToken(credential.Tenant, credential, effectiveScopes);
+    var expiresIn = Math.Max(0, (int)Math.Ceiling((token.ExpiresAt - DateTime.UtcNow).TotalSeconds));
+
+    return Results.Json(new
+    {
+        access_token = token.Token,
+        token_type = "Bearer",
+        expires_in = expiresIn,
+        scope = string.Join(' ', token.Scopes)
+    });
+
+    IResult InvalidClient() =>
+        Results.Json(new { error = "invalid_client" }, statusCode: StatusCodes.Status401Unauthorized);
+})
    .WithTags("Auth")
    .WithOpenApi(op =>
    {
-       op.Summary = "Client credentials token issuance (coming soon)";
+       op.Summary = "Client credentials token issuance";
        return op;
    });
 

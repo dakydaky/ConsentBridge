@@ -137,7 +137,7 @@ curl -X POST http://localhost:8080/v1/consents/{consent_id}/revoke -i
 - `POST /v1/applications` → submit **detached‑JWS** signed ApplyPayload
 - `GET /v1/applications/{id}` → retrieve application status
 - `POST /v1/consents/{id}/revoke` → revoke consent
-- `POST /oauth/token` → client credentials grant *(placeholder 501 until auth implemented; see docs/adr/0001-consent-ux-auth.md)*
+- `POST /oauth/token`  → client credentials grant (hashed secrets + JWT access tokens)
 - `GET /.well-known/jwks.json` → platform public keys (planned)
 
 See **`docs/api/openapi.yaml`** for full schemas.
@@ -205,5 +205,6 @@ PRs welcome! Please:
 
 ## 🙌 Credits
 Built with ❤️ for EU job seekers, boards, and ATS vendors who want **trust without friction**.
+
 
 

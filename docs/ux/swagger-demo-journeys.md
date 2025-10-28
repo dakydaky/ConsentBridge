@@ -63,7 +63,7 @@ This note documents the current end-to-end flows we can showcase via Swagger (`h
 1. **Create consent** – same as step A1.
 2. **Inspect consent** *(future)*:
    - Planned endpoint: `GET /v1/consents/{id}` (not yet implemented).
-   - Will require tenant-auth (bearer token) once `/oauth/token` is live.
+   - Will require tenant-auth (bearer token from `/oauth/token`).
 3. **Revoke consent**
    - Endpoint: `POST /v1/consents/{id}/revoke`
    - Expected response: `204 No Content`.
@@ -71,21 +71,39 @@ This note documents the current end-to-end flows we can showcase via Swagger (`h
 
 ---
 
-## Journey C – Forthcoming auth enhancements (placeholders)
+## Journey C - Tenant auth (`/oauth/token`)
 
-These flows are stubs today; include them in demos to set expectations.
-
-- **Tenant tokens (`/oauth/token`)**
-  - Currently returns `501 Not Implemented`.
-  - Once built: agents obtain bearer token via client credentials; required for `/v1/applications`.
+- **Obtain access token**
+  - Endpoint: `POST /oauth/token`
+  - Content-Type: `application/x-www-form-urlencoded`
+  - Body example:
+    ```
+    grant_type=client_credentials&
+    client_id=agent_acme_client&
+    client_secret=agent-secret&
+    scope=apply.submit
+    ```
+  - Expected response: `200 OK`
+    ```json
+    {
+      "access_token": "<JWT>",
+      "token_type": "Bearer",
+      "expires_in": 1800,
+      "scope": "apply.submit"
+    }
+    ```
+  - Returned JWT includes claims for tenant slug (`sub`), tenant id, tenant type, client id, and scopes.
+  - Enforcement on `/v1/applications` is still pending; note this to viewers.
 
 - **Consent web flow**
   - Not yet exposed in Swagger.
   - Will replace direct `POST /v1/consents` with browser-based approval, then the API will issue the consent token through `IConsentTokenFactory`.
-
 Track progress in:
 - `docs/adr/0001-consent-ux-auth.md`
 - `docs/design/consent-ux-auth-foundation.md`
 - `TODO.md` (Consent UX & Auth section)
 
 Update this file after each milestone to keep product demos and investor walkthroughs consistent.
+
+
+

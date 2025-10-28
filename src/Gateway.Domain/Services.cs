@@ -22,3 +22,10 @@ public interface IConsentTokenFactory
 }
 
 public record ConsentTokenIssueResult(string Token, Guid TokenId, DateTime ExpiresAt);
+
+public interface IAccessTokenFactory
+{
+    AccessTokenResult IssueToken(Tenant tenant, TenantCredential credential, IReadOnlyList<string> scopes);
+}
+
+public record AccessTokenResult(string Token, DateTime ExpiresAt, IReadOnlyList<string> Scopes);

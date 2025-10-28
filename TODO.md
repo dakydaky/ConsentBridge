@@ -2,8 +2,8 @@ Near-Term Productization
 
 Consent UX & Auth
 - ✅ ADR 0001 recorded; see docs/adr/0001-consent-ux-auth.md and foundational design in docs/design/consent-ux-auth-foundation.md.
-- [WIP] Implement tenant & credential persistence (schema in place; add provisioning flows + seeding).
-- Build `/oauth/token` client credentials endpoint (secret hashing, JWT emission, scope enforcement).
+- ✅ Implement tenant & credential persistence (schema + demo seeding in place).
+- ✅ `/oauth/token` client credentials endpoint with hashed secret validation + JWT issuance (enforcement next).
 - Deliver consent web flow (email verification, consent approval UI, token issuance via Gateway.CertAuthority).
 - Replace `ctok:` demo token with signed JWT + detached-JWS validation per tenant.
 Real Signature Handling – Replace AcceptAllVerifier with ES256/EdDSA detached-JWS validation, plug in tenant JWKS discovery, and persist JWS metadata for audits (docs/spec/whitepaper.md and spec-multi.md call out cryptographic guarantees).
@@ -23,3 +23,4 @@ Ecosystem & Delivery
 SDK & Client Tooling – Flesh out Gateway.Sdk.DotNet with actual HTTP client, signing helpers, and samples; publish to help partners integrate.
 Deployment Assets – Replace placeholder .gitkeep charts/manifests with real Helm/K8s manifests, CI pipeline definitions, and update README setup steps accordingly.
 Documentation & Storytelling – Expand README with architecture diagrams, API walkthroughs, and troubleshooting; align Swagger metadata with the published OpenAPI in docs/api/openapi.yaml.
+

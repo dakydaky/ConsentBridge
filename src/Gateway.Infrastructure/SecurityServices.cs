@@ -1,6 +1,12 @@
 using System;
+using System.Collections.Generic;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Security.Cryptography;
+using System.Text;
 using Gateway.Domain;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 
 namespace Gateway.Infrastructure;
 
@@ -54,4 +60,54 @@ public sealed class DemoConsentTokenFactory : IConsentTokenFactory
         var token = $"ctok:{tokenId}";
         return new ConsentTokenIssueResult(token, tokenId, expires);
     }
+}
+
+public sealed class JwtAccessTokenFactory : IAccessTokenFactory
+{
+    private readonly JwtAccessTokenOptions _options;
+    private readonly JwtSecurityTokenHandler _handler;
+    private readonly byte[] _signingKey;
+
+    public JwtAccessTokenFactory(IOptions<JwtAccessTokenOptions> options)
+    {
+        _options = options.Value ?? throw new ArgumentNullException(nameof(options));
+        if (string.IsNullOrWhiteSpace(_options.SigningKey))
+        {
+            throw new InvalidOperationException("Auth:Jwt:SigningKey must be configured.");
+        }
+        _handler = new JwtSecurityTokenHandler();
+        _signingKey = Encoding.UTF8.GetBytes(_options.SigningKey);
+    }
+
+    public AccessTokenResult IssueToken(Tenant tenant, TenantCredential credential, IReadOnlyList<string> scopes)
+    {
+        var expires = DateTime.UtcNow.AddMinutes(_options.AccessTokenLifetimeMinutes);
+        var claims = new[]
+        {
+            new Claim(JwtRegisteredClaimNames.Sub, tenant.Slug),
+            new Claim("tenant_id", tenant.Id.ToString()),
+            new Claim("tenant_type", tenant.Type.ToString()),
+            new Claim("client_id", credential.ClientId),
+            new Claim("scope", string.Join(' ', scopes))
+        };
+
+        var creds = new SigningCredentials(new SymmetricSecurityKey(_signingKey), SecurityAlgorithms.HmacSha256);
+        var token = new JwtSecurityToken(
+            issuer: _options.Issuer,
+            audience: _options.Audience,
+            claims: claims,
+            notBefore: DateTime.UtcNow,
+            expires: expires,
+            signingCredentials: creds);
+
+        return new AccessTokenResult(_handler.WriteToken(token), expires, scopes);
+    }
+}
+
+public sealed class JwtAccessTokenOptions
+{
+    public string Issuer { get; set; } = "consent-apply-gateway";
+    public string Audience { get; set; } = "consent-apply-gateway";
+    public string SigningKey { get; set; } = string.Empty;
+    public int AccessTokenLifetimeMinutes { get; set; } = 30;
 }
