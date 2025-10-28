@@ -22,22 +22,251 @@
                     <th>Candidate</th>
                     <th>Job</th>
                     <th>Status</th>
+                    <th>Payload</th>
                 </tr>
             </thead>
             <tbody>
             @foreach (var app in Model.Applications)
             {
+                var sanitizedId = app.Id.Replace(':', '_').Replace('/', '_').Replace('\\', '_');
+                var templateId = $"payload-template-{sanitizedId}";
                 <tr>
                     <td>@app.ReceivedAt.ToString("yyyy-MM-dd HH:mm")</td>
                     <td>@app.CandidateEmail</td>
                     <td>@app.JobTitle</td>
                     <td>@app.Status</td>
+                    <td class="payload-cell">
+                        @if (app.Payload is { } payload)
+                        {
+                            var hasFirst = !string.IsNullOrWhiteSpace(payload.Candidate.FirstName);
+                            var hasLast = !string.IsNullOrWhiteSpace(payload.Candidate.LastName);
+                            var candidateName = hasFirst && hasLast
+                                ? $"{payload.Candidate.FirstName} {payload.Candidate.LastName}"
+                                : hasFirst
+                                    ? payload.Candidate.FirstName
+                                    : hasLast
+                                        ? payload.Candidate.LastName
+                                        : null;
+                            var submittedDisplay = payload.Meta.Timestamp?.ToString("yyyy-MM-dd HH:mm 'UTC'");
+                            var hasMaterials = !string.IsNullOrWhiteSpace(payload.Materials.CoverLetterText) || payload.Materials.Answers.Count > 0;
+
+                            <button type="button" class="payload-btn" data-open-payload="@sanitizedId">View payload</button>
+                            <template id="@templateId">
+                                <div class="modal-header">
+                                    <h3>Application Payload</h3>
+                                    <p class="muted-line">Application <span class="payload-token">@app.Id</span></p>
+                                </div>
+
+                                @if (!string.IsNullOrWhiteSpace(payload.ConsentToken))
+                                {
+                                    <div class="detail-pill">
+                                        Consent Token <span class="payload-token">@payload.ConsentToken</span>
+                                    </div>
+                                }
+
+                                <div class="detail-grid">
+                                    @if (!string.IsNullOrWhiteSpace(candidateName))
+                                    {
+                                        <div class="detail-card">
+                                            <h2>Candidate</h2>
+                                            <p>@candidateName</p>
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(payload.Candidate.Id))
+                                    {
+                                        <div class="detail-card">
+                                            <h2>Candidate ID</h2>
+                                            <p class="payload-token">@payload.Candidate.Id</p>
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(payload.Candidate.Email))
+                                    {
+                                        <div class="detail-card">
+                                            <h2>Email</h2>
+                                            <p>@payload.Candidate.Email</p>
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(payload.Candidate.Phone))
+                                    {
+                                        <div class="detail-card">
+                                            <h2>Phone</h2>
+                                            <p>@payload.Candidate.Phone</p>
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(payload.Job.Title))
+                                    {
+                                        <div class="detail-card">
+                                            <h2>Job Title</h2>
+                                            <p>@payload.Job.Title</p>
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(payload.Job.Company))
+                                    {
+                                        <div class="detail-card">
+                                            <h2>Company</h2>
+                                            <p>@payload.Job.Company</p>
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(payload.Job.ExternalId))
+                                    {
+                                        <div class="detail-card">
+                                            <h2>Job External ID</h2>
+                                            <p class="payload-token">@payload.Job.ExternalId</p>
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(payload.Job.ApplyEndpoint))
+                                    {
+                                        <div class="detail-card">
+                                            <h2>Apply Endpoint</h2>
+                                            <p>@payload.Job.ApplyEndpoint</p>
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(payload.Candidate.CvUrl))
+                                    {
+                                        <div class="detail-card">
+                                            <h2>CV URL</h2>
+                                            <p><a href="@payload.Candidate.CvUrl" target="_blank" rel="noreferrer">@payload.Candidate.CvUrl</a></p>
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(payload.Candidate.CvSha256))
+                                    {
+                                        <div class="detail-card">
+                                            <h2>CV SHA-256</h2>
+                                            <p class="payload-token">@payload.Candidate.CvSha256</p>
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(payload.Meta.Locale))
+                                    {
+                                        <div class="detail-card">
+                                            <h2>Locale</h2>
+                                            <p>@payload.Meta.Locale</p>
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(submittedDisplay))
+                                    {
+                                        <div class="detail-card">
+                                            <h2>Submitted</h2>
+                                            <p>@submittedDisplay</p>
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(payload.Meta.UserAgent))
+                                    {
+                                        <div class="detail-card">
+                                            <h2>User Agent</h2>
+                                            <p>@payload.Meta.UserAgent</p>
+                                        </div>
+                                    }
+                                </div>
+
+                                @if (hasMaterials)
+                                {
+                                    <div class="payload-section">
+                                        <h4>Materials</h4>
+                                        @if (!string.IsNullOrWhiteSpace(payload.Materials.CoverLetterText))
+                                        {
+                                            <div class="payload-field">
+                                                <span class="payload-label">Cover Letter</span>
+                                                <p class="payload-block">@payload.Materials.CoverLetterText</p>
+                                            </div>
+                                        }
+                                        @if (payload.Materials.Answers.Count > 0)
+                                        {
+                                            <div class="payload-field">
+                                                <span class="payload-label">Questionnaire</span>
+                                                <ul class="payload-answer-list">
+                                                    @foreach (var answer in payload.Materials.Answers)
+                                                    {
+                                                        <li>
+                                                            @if (!string.IsNullOrWhiteSpace(answer.QuestionId))
+                                                            {
+                                                                <span class="payload-answer-question">@answer.QuestionId:</span>
+                                                            }
+                                                            <span>@answer.AnswerText</span>
+                                                        </li>
+                                                    }
+                                                </ul>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </template>
+                        }
+                        else
+                        {
+                            <span class="muted">Payload unavailable</span>
+                        }
+                    </td>
                 </tr>
             }
             </tbody>
         </table>
     }
 </div>
+
+<div id="payload-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-dismiss="payload"></div>
+    <div class="modal-dialog">
+        <button type="button" class="modal-close" data-dismiss="payload" aria-label="Close">×</button>
+        <div class="modal-content"></div>
+    </div>
+</div>
+
+<script>
+(() => {
+    const modal = document.getElementById("payload-modal");
+    if (!modal) {
+        return;
+    }
+
+    const content = modal.querySelector(".modal-content");
+
+    const closeModal = () => {
+        modal.setAttribute("hidden", "");
+        document.body.classList.remove("modal-open");
+        if (content) {
+            content.innerHTML = "";
+        }
+    };
+
+    document.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) {
+            return;
+        }
+
+        if (target.matches("[data-dismiss='payload']") || target.closest("[data-dismiss='payload']")) {
+            closeModal();
+            return;
+        }
+
+        const trigger = target.closest("[data-open-payload]");
+        if (!trigger) {
+            return;
+        }
+
+        const payloadId = trigger.getAttribute("data-open-payload");
+        if (!payloadId || !content) {
+            return;
+        }
+
+        const template = document.getElementById(`payload-template-${payloadId}`);
+        if (!(template instanceof HTMLTemplateElement)) {
+            return;
+        }
+
+        content.innerHTML = "";
+        content.appendChild(template.content.cloneNode(true));
+        modal.removeAttribute("hidden");
+        document.body.classList.add("modal-open");
+    });
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !modal.hasAttribute("hidden")) {
+            closeModal();
+        }
+    });
+})();
+</script>
 
 <div class="card">
     <h2>Board Integration Docs</h2>

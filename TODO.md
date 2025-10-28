@@ -1,32 +1,64 @@
-Near-Term Productization
+# ConsentBridge MVP Roadmap
+_Last refreshed: 2025-10-28_
 
-Consent UX & Auth
-- ✅ ADR 0001 recorded; see docs/adr/0001-consent-ux-auth.md and foundational design in docs/design/consent-ux-auth-foundation.md.
-- ✅ Implement tenant & credential persistence (schema + demo seeding in place).
-- ✅ `/oauth/token` client credentials endpoint with hashed secret validation + JWT issuance.
-- ✅ Enforce bearer tokens on `/v1/applications` (JWT auth + scope policy).
-- ✅ Deliver consent web flow MVP (OTP verification, Razor pages, consent issuance).
-- Replace `ctok:` demo token with signed JWT + detached-JWS validation per tenant.
-- ✅ Real Signature Handling – Gateway validates ES256 detached JWS via tenant JWKS (config-backed for demo) and stores submission signature metadata for audit trails.
-- ✅ Receipts & Provenance – Signed receipt contract in place (MockBoard signing, gateway verifies & stores hash/signature) with `/applications/{id}` portal view rendering provenance payload.
-Data & Compliance
-✅ Retention sweeps – automated removal of aged consent requests and receipt payloads with configurable windows
+**Legend:** ✅ delivered · 🚧 in progress · ⏳ queued · 🧭 requires ADR decision
 
-Migrations & Seed Data – Formalize EF migrations (already scaffolded) and add seed scripts for demo tenants; include automated dotnet ef database update in container startup once pending-model-changes are eliminated.
-✅ DSR Endpoints – Export/delete APIs in place; follow-up retention automation and SLA tracking remain outstanding.
-Audit Trails – Extend persistence layer with immutable audit tables and payload hashing strategies expected in the whitepaper.
-Platform Hardening
+## 1. Consent UX & Auth
+- ✅ **ADR 0001: Consent UX & Auth foundation** — recorded in `docs/adr/0001-consent-ux-auth.md` with supporting UX design.
+- ✅ **Tenant & credential persistence** — schemas and demo seeding in place for agent/board tenants.
+- ✅ **Client credentials OAuth flow** — `/oauth/token` issues JWTs with hashed secrets and scope enforcement.
+- ✅ **Protected application APIs** — `/v1/applications` now enforce bearer tokens and scope policies.
+- ✅ **Consent web flow MVP** — OTP verification, Razor pages, and consent issuance path shipped.
+- ⏳ **Signed consent tokens (`ctok:` replacement)** — issue per-tenant JWTs, store detached JWS metadata, and rotate keys.
+- ⏳ **Consent session lifecycle policy** — define token TTL, renewal, and post-expiry handling.
+- ⏳ **Agent & board scope management UX** — surface scopes and authorization messaging inside the consent flow.
+- ⏳ **OTP throttling & lockout rules** — rate-limit verification attempts and capture audit events.
 
-Integration & Unit Tests – Expand coverage beyond the new receipt signer/verifier tests to include consent issuance, application flow, adapter error paths, and signature failure handling end-to-end.
-Observability & Logging – Wire structured logging (Serilog sinks, correlation IDs), health probes, and metrics/OTel integration mentioned in roadmap.
-Configuration & Secrets – Externalize connection strings, JWKS endpoints, and tenant keys via dotenv/Kubernetes secrets; document ops runbooks.
-Ecosystem & Delivery
+## 2. Data Protection & Compliance
+- ✅ **Retention sweeps** — automated removal of aged consent requests and receipt payloads with configurable windows.
+- ✅ **DSR endpoints** — export/delete APIs online; SLA tracking remains to be wired up.
+- ⏳ **Retention SLA instrumentation** — metrics and alerts to prove sweeps run within policy windows.
+- ⏳ **Immutable audit trail tables** — extend persistence layer with hash chaining and append-only semantics.
+- ⏳ **PII field-level encryption strategy** — implement `candidate.pii_enc` handling aligned to spec guidance.
+- ⏳ **DSR export packaging** — deliver signed archive responses and documented operator flow.
 
-SDK & Client Tooling – Flesh out Gateway.Sdk.DotNet with actual HTTP client, signing helpers, and samples; publish to help partners integrate.
-Deployment Assets – Replace placeholder .gitkeep charts/manifests with real Helm/K8s manifests, CI pipeline definitions, and update README setup steps accordingly.
-Documentation & Storytelling – Expand README with architecture diagrams, API walkthroughs, and troubleshooting; align Swagger metadata with the published OpenAPI in docs/api/openapi.yaml.
+## 3. Platform Hardening & Ops
+- ⏳ **Integration & regression tests** — add coverage for consent issuance, application flow, adapter error paths, and signature failure handling.
+- ⏳ **Load-test harness** — scripted consent/application submissions with configurable tenant mix.
+- ⏳ **Structured logging & correlation IDs** — Serilog enrichers, trace IDs, and request-scoped metadata.
+- ⏳ **Health & readiness probes** — ASP.NET health checks plus container compose wiring.
+- ⏳ **Metrics / OpenTelemetry bridge** — emit gateway and adapter telemetry to OTel collectors.
+- ⏳ **Centralised secret management** — externalise connection strings, JWKS endpoints, and tenant keys via env/secret stores.
+- ⏳ **Configuration runbooks** — operator documentation, `.env` templates, and troubleshooting decision tree.
 
-MockBoard UX
-- [x] Add Razor-based dashboard with recent applies
-- [ ] Surface real payload details (parse JSON)
-- [x] Signed receipt viewer (portal renders receipt payload/signature)
+## 4. Data Layer & Migrations
+- ✅ **EF migrations scaffolded** — baseline migration committed alongside tooling.
+- ⏳ **Formal migration pipeline** — ensure `dotnet ef database update` runs on container startup.
+- ⏳ **Seed scripts for demo tenants** — scripted identities, keys, and sample payloads for demo environments.
+- ⏳ **Migration rollback playbook** — define down-migrations, backups, and recovery steps.
+
+## 5. Ecosystem & Delivery
+- ⏳ **Gateway .NET SDK** — ship HTTP client, signing helpers, usage samples, and NuGet packaging.
+- ⏳ **Language-agnostic quickstarts** — publish Node/Python examples covering consent issuance and application submission.
+- ⏳ **Deployment assets** — replace placeholder manifests with Helm/K8s charts and CI pipeline definitions.
+- ⏳ **Release automation** — versioned container images, changelog generation, and tag promotion workflow.
+- ⏳ **Documentation revamp** — expand README with architecture diagrams, API walkthroughs, troubleshooting, and Swagger/OpenAPI alignment.
+
+## 6. MockBoard Adapter UX
+- ✅ **Dashboard of recent applies** — Razor-based landing page shipped.
+- ✅ **Payload modal viewer** — gallery-style rendering of parsed payload details.
+- ✅ **Signed receipt viewer** — displays receipt payload and signature provenance.
+- ⏳ **Filtering & search** — filter feed by status, consent, or job reference.
+- ⏳ **Live updates** — push new applications into the dashboard without manual refresh.
+
+## 7. Security & Risk
+- ⏳ **Threat model refresh** — update STRIDE analysis for consent issuance and board adapters.
+- ⏳ **Key rotation playbook** — automation and runbook for updating tenant JWKS material.
+- ⏳ **Pen-test readiness checklist** — logging, alerting, and break-glass access controls.
+
+## ADR Backlog
+- 🧭 **ADR 0002: Consent token signing & key rotation** — capture how signed `ctok` tokens are generated, rotated, and validated.
+- 🧭 **ADR 0003: Audit trail persistence strategy** — define immutable storage model, hashing scheme, and retention.
+- 🧭 **ADR 0004: Observability & telemetry stack** — logging, metrics, tracing defaults, and tooling decisions.
+- 🧭 **ADR 0005: Secrets & configuration management** — environments, secret stores, and bootstrap process.
+- 🧭 **ADR 0006: Deployment topology** — baseline Kubernetes footprint, supporting services, and scaling assumptions.

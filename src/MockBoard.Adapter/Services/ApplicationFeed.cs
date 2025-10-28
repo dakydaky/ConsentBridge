@@ -17,4 +17,10 @@ public class ApplicationFeed
     public IReadOnlyList<ApplicationEntry> ListApplications() => _queue.Reverse().ToList();
 }
 
-public record ApplicationEntry(string Id, string CandidateEmail, string JobTitle, string Status, DateTime ReceivedAt);
+public record ApplicationEntry(
+    string Id,
+    string CandidateEmail,
+    string JobTitle,
+    string Status,
+    DateTime ReceivedAt,
+    ApplicationPayloadDetails? Payload);

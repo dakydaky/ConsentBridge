@@ -31,13 +31,20 @@ app.MapPost("/v1/mock/applications", (
     var receivedAt = DateTime.UtcNow;
     var candidateEmail = TryGetCandidateEmail(submission.Payload) ?? "alice@example.com";
     var jobTitle = TryGetJobTitle(submission.Payload) ?? "Backend Engineer";
+    var payloadDetails = ApplicationPayloadDetails.TryParse(submission.Payload);
+
+    if (payloadDetails is null)
+    {
+        Log.Warning("Failed to parse application payload for {ApplicationId}", submission.ApplicationId);
+    }
 
     var entry = new ApplicationEntry(
         submission.ApplicationId,
         candidateEmail,
         jobTitle,
         "Accepted",
-        receivedAt);
+        receivedAt,
+        payloadDetails);
     feed.Add(entry);
 
     var payload = new BoardReceiptPayload(
