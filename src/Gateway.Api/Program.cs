@@ -17,6 +17,7 @@ using System.Text;
 using Microsoft.AspNetCore.DataProtection;
 using System.IO;
 using System.Text.Json;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -336,13 +337,26 @@ app.MapPost("/v1/applications", async (
     appRec.Status = ApplicationStatus.Failed;
     await db.SaveChangesAsync();
     return Results.StatusCode(502);
-}).RequireAuthorization("apply.submit");
+}).RequireAuthorization("apply.submit")
+  .WithTags("Applications")
+  .WithOpenApi(op =>
+  {
+      op.Summary = "Submit a signed application payload";
+      return op;
+  });
 
-app.MapGet("/v1/applications/{id:guid}", async (Guid id, GatewayDbContext db) =>
+app.MapGet("/v1/applications/{id:guid}", async Task<Results<NotFound, Ok<ApplicationRecordDto>>> (Guid id, GatewayDbContext db) =>
 {
-    var application = await db.Applications.FindAsync(id);
-    return application is null ? Results.NotFound() : Results.Ok(application);
-});
+    var application = await db.Applications.AsNoTracking().FirstOrDefaultAsync(a => a.Id == id);
+    return application is null
+        ? TypedResults.NotFound()
+        : TypedResults.Ok(MapApplication(application));
+}).WithTags("Applications")
+  .WithOpenApi(op =>
+  {
+      op.Summary = "Retrieve application status and receipt metadata";
+      return op;
+  });
 
 app.MapPost("/v1/consents/{id:guid}/revoke", async (Guid id, GatewayDbContext db) =>
 {
@@ -503,6 +517,19 @@ bool HasScope(ClaimsPrincipal user, string scope)
 
     return false;
 }
+
+ApplicationRecordDto MapApplication(Application application) =>
+    new(
+        application.Id,
+        application.ConsentId,
+        application.AgentTenantId,
+        application.BoardTenantId,
+        application.Status,
+        application.SubmittedAt,
+        application.PayloadHash,
+        application.Receipt,
+        application.ReceiptSignature,
+        application.ReceiptHash);
 
 ConsentViewDto MapConsent(Consent consent) =>
     new(

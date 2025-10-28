@@ -37,3 +37,15 @@ public record ConsentViewDto(
     DateTime TokenExpiresAt,
     Guid TokenId,
     DateTime? RevokedAt);
+
+public record ApplicationRecordDto(
+    Guid Id,
+    Guid ConsentId,
+    string AgentTenantId,
+    string BoardTenantId,
+    ApplicationStatus Status,
+    DateTime SubmittedAt,
+    string PayloadHash,
+    string? Receipt,
+    string? ReceiptSignature,
+    string? ReceiptHash);

@@ -1,0 +1,116 @@
+@page "/applications/{id:guid}"
+@model Gateway.Api.Areas.Applications.Pages.DetailsModel
+@{
+    ViewData["Title"] = "Application Receipt";
+}
+
+<h1>Application Receipt</h1>
+
+@if (Model.Application is null)
+{
+    <div class="message error">
+        Application not found.
+    </div>
+}
+else
+{
+    <div class="badge">
+        <span>Application</span>
+        <strong>@Model.Application.Id</strong>
+    </div>
+
+    <section class="message">
+        Verified status from <strong>@Model.Application.BoardTenantId</strong>.
+        Receipt hash is <code class="token">@(Model.Application.ReceiptHash ?? "—")</code>.
+    </section>
+
+    <style>
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 1.25rem;
+            margin-bottom: 1.75rem;
+        }
+        .detail-card {
+            padding: 1rem 1.25rem;
+            border-radius: 12px;
+            background: rgba(146, 170, 255, 0.08);
+            border: 1px solid rgba(146, 170, 255, 0.18);
+        }
+        .detail-card h2 {
+            font-size: 0.9rem;
+            margin-bottom: 0.35rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: rgba(211, 222, 255, 0.8);
+        }
+        .detail-card p {
+            margin: 0;
+            font-size: 1rem;
+            word-break: break-word;
+        }
+        pre.json {
+            margin: 0;
+            padding: 1.2rem;
+            border-radius: 14px;
+            background: rgba(13, 20, 38, 0.85);
+            border: 1px solid rgba(146, 170, 255, 0.25);
+            font-size: 0.9rem;
+            line-height: 1.5;
+            overflow-x: auto;
+            max-height: 380px;
+        }
+        .section-header {
+            margin-top: 2rem;
+            margin-bottom: 0.5rem;
+        }
+    </style>
+
+    <div class="detail-grid">
+        <div class="detail-card">
+            <h2>Status</h2>
+            <p>@Model.Application.Status</p>
+        </div>
+        <div class="detail-card">
+            <h2>Submitted</h2>
+            <p>@Model.Application.SubmittedAt.ToString("yyyy-MM-dd HH:mm:ss 'UTC'")</p>
+        </div>
+        <div class="detail-card">
+            <h2>Consent</h2>
+            <p>@Model.Application.ConsentId</p>
+        </div>
+        <div class="detail-card">
+            <h2>Agent Tenant</h2>
+            <p>@Model.Application.AgentTenantId</p>
+        </div>
+        <div class="detail-card">
+            <h2>Board Tenant</h2>
+            <p>@Model.Application.BoardTenantId</p>
+        </div>
+        <div class="detail-card">
+            <h2>Payload Hash</h2>
+            <p>@Model.Application.PayloadHash</p>
+        </div>
+    </div>
+
+    <h2 class="section-header">Receipt Signature</h2>
+    <code class="token">
+        @(Model.Application.ReceiptSignature ?? "Receipt pending")
+    </code>
+
+    <h2 class="section-header">Receipt Payload</h2>
+    @if (!string.IsNullOrWhiteSpace(Model.ReceiptJson))
+    {
+        <pre class="json">@Html.Raw(Model.ReceiptJson)</pre>
+    }
+    else
+    {
+        <div class="message">
+            No receipt payload stored yet for this application.
+        </div>
+    }
+
+    <footer>
+        View this page at <code class="token">/applications/@Model.Application.Id</code> once a receipt is recorded.
+    </footer>
+}

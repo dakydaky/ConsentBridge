@@ -34,7 +34,7 @@ This note documents the current end-to-end flows we can showcase via Swagger (`h
        The script prints the canonical JSON and the value to copy into the `X-JWS-Signature` header—use that canonical payload as the request body.
    - Endpoint: `POST /v1/applications`
    - Headers: `Authorization: Bearer <token>` and `X-JWS-Signature: detached JWS`
-   - Body example (swap in real `ConsentToken`):
+   - Body example (swap in real `consentToken`):
      ```json
      {
        "consentToken": "ctok:REPLACE",
@@ -63,6 +63,7 @@ This note documents the current end-to-end flows we can showcase via Swagger (`h
 4. **Review via API**
    - Endpoint: `GET /v1/applications/{id}`
    - Expected response: `200 OK` with receipt, `receiptSignature`, and `receiptHash` metadata showing the forwarded application.
+   - Optional: open `http://localhost:8080/applications/{id}` to see the stored receipt payload and signature in the portal.
 
 ---
 
