@@ -1,6 +1,5 @@
 using Gateway.Domain;
 using Gateway.Infrastructure;
-using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using FluentAssertions;
 

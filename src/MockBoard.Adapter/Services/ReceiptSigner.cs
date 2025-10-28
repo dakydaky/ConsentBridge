@@ -1,9 +1,7 @@
-using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Gateway.Domain;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
