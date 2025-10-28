@@ -42,10 +42,7 @@ var payloadSerializerOptions = new JsonSerializerOptions(JsonSerializerDefaults.
 {
     WriteIndented = false
 };
-var jwsHeaderSerializerOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web)
-{
-    PropertyNameCaseInsensitive = true
-};
+// JWS header serializer options moved into Gateway.Api.Helpers.JwsHelpers
 
 // Http client for the MockBoard adapter
 builder.Services.AddHttpClient("mockboard", client =>
@@ -100,7 +97,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("apply.submit", policy =>
-        policy.RequireAssertion(ctx => HasScope(ctx.User, "apply.submit")));
+        policy.RequireAssertion(ctx => AuthHelpers.HasScope(ctx.User, "apply.submit")));
 });
 
 var keyPath = builder.Configuration.GetValue<string>("DataProtection:KeyPath") ?? "/app/dataprotection";
@@ -177,7 +174,7 @@ app.MapGet("/.well-known/jwks.json", (ITenantKeyStore keyStore) =>
     var response = new
     {
         keys = keyStore.GetAll()
-            .SelectMany(entry => ProjectKeys(entry.Value, entry.Key))
+            .SelectMany(entry => ApiHelpers.ProjectKeys(entry.Value, entry.Key))
     };
 
     return Results.Json(response);
@@ -195,7 +192,7 @@ app.MapGet("/tenants/{slug}/jwks.json", (string slug, ITenantKeyStore keyStore) 
         return Results.NotFound();
     }
 
-    var keys = ProjectKeys(jwks, slug).ToArray();
+    var keys = ApiHelpers.ProjectKeys(jwks, slug).ToArray();
     if (keys.Length == 0)
     {
         return Results.NotFound();
@@ -220,7 +217,7 @@ app.MapPost("/v1/dsr/export", async (
         return Results.BadRequest(new { error = "invalid_request", error_description = "candidateEmail is required." });
     }
 
-    var (tenantSlug, tenantType) = GetTenantContext(user);
+    var (tenantSlug, tenantType) = AuthHelpers.GetTenantContext(user);
     if (string.IsNullOrWhiteSpace(tenantSlug))
     {
         return Results.Unauthorized();
@@ -252,7 +249,7 @@ app.MapPost("/v1/dsr/delete", async (
         return Results.BadRequest(new { error = "confirmation_required", error_description = "Set confirm=true to perform deletion." });
     }
 
-    var (tenantSlug, tenantType) = GetTenantContext(user);
+    var (tenantSlug, tenantType) = AuthHelpers.GetTenantContext(user);
     if (string.IsNullOrWhiteSpace(tenantSlug))
     {
         return Results.Unauthorized();
@@ -278,7 +275,7 @@ app.MapPost("/v1/consent-requests", async (
     IClientSecretHasher hasher,
     ILogger<Program> logger) =>
 {
-    var (tenantSlug, tenantType) = GetTenantContext(user);
+    var (tenantSlug, tenantType) = AuthHelpers.GetTenantContext(user);
     if (tenantSlug is null || tenantType != TenantType.Agent)
     {
         return Results.Forbid();
@@ -313,7 +310,7 @@ app.MapPost("/v1/consent-requests", async (
         ExpiresAt = now.AddHours(24)
     };
 
-    var code = GenerateVerificationCode();
+    var code = ApiHelpers.GenerateVerificationCode();
     request.VerificationCodeHash = hasher.HashSecret(code);
 
     db.ConsentRequests.Add(request);
@@ -334,7 +331,7 @@ app.MapGet("/v1/consents", async (
     [FromQuery] int? take,
     GatewayDbContext db) =>
 {
-    var (tenantSlug, tenantType) = GetTenantContext(user);
+    var (tenantSlug, tenantType) = AuthHelpers.GetTenantContext(user);
     if (tenantSlug is null || tenantType != TenantType.Agent)
     {
         return Results.Forbid();
@@ -347,7 +344,7 @@ app.MapGet("/v1/consents", async (
         .Take(pageSize)
         .ToListAsync();
 
-    return Results.Ok(consents.Select(MapConsent));
+    return Results.Ok(consents.Select(ApiHelpers.MapConsent));
 }).RequireAuthorization("apply.submit");
 
 app.MapGet("/v1/consents/{id:guid}", async (
@@ -355,7 +352,7 @@ app.MapGet("/v1/consents/{id:guid}", async (
     Guid id,
     GatewayDbContext db) =>
 {
-    var (tenantSlug, tenantType) = GetTenantContext(user);
+    var (tenantSlug, tenantType) = AuthHelpers.GetTenantContext(user);
     if (tenantSlug is null || tenantType != TenantType.Agent)
     {
         return Results.Forbid();
@@ -369,7 +366,7 @@ app.MapGet("/v1/consents/{id:guid}", async (
         return Results.NotFound();
     }
 
-    return Results.Ok(MapConsent(consent));
+    return Results.Ok(ApiHelpers.MapConsent(consent));
 }).RequireAuthorization("apply.submit");
 
 // Submit Application (consent + JWS validation are stubbed for demo)
@@ -503,7 +500,7 @@ app.MapPost("/v1/applications", async (
     }
 
     var payloadBytes = JsonSerializer.SerializeToUtf8Bytes(payload, payloadSerializerOptions);
-    if (!TryParseDetachedJws(jws, payloadBytes, out var submissionHeader))
+    if (!JwsHelpers.TryParseDetachedJws(jws, payloadBytes, out var submissionHeader))
     {
         return Results.BadRequest(new { error = "invalid_signature" });
     }
@@ -589,7 +586,7 @@ app.MapGet("/v1/applications/{id:guid}", async Task<Results<NotFound, Ok<Applica
     var application = await db.Applications.AsNoTracking().FirstOrDefaultAsync(a => a.Id == id);
     return application is null
         ? TypedResults.NotFound()
-        : TypedResults.Ok(MapApplication(application));
+        : TypedResults.Ok(ApiHelpers.MapApplication(application));
 }).WithTags("Applications")
   .WithOpenApi(op =>
   {
@@ -711,52 +708,6 @@ app.MapGet("/internal/tenants", () => Results.StatusCode(StatusCodes.Status501No
 app.MapRazorPages();
 app.Run();
 
-string GenerateVerificationCode()
-{
-    var value = RandomNumberGenerator.GetInt32(0, 1_000_000);
-    return value.ToString("D6");
-}
-
-(string? slug, TenantType? type) GetTenantContext(ClaimsPrincipal user)
-{
-    var slug = user.FindFirstValue("sub");
-    var typeValue = user.FindFirstValue("tenant_type");
-    if (string.IsNullOrWhiteSpace(slug))
-    {
-        return (null, null);
-    }
-
-    return Enum.TryParse<TenantType>(typeValue, out var parsed)
-        ? (slug, parsed)
-        : (slug, null);
-}
-
-bool HasScope(ClaimsPrincipal user, string scope)
-{
-    IEnumerable<Claim> EnumerateScopeClaims(ClaimsPrincipal principal)
-    {
-        foreach (var claim in principal.FindAll("scope"))
-        {
-            yield return claim;
-        }
-        foreach (var claim in principal.FindAll("http://schemas.microsoft.com/ws/2008/06/identity/claims/scope"))
-        {
-            yield return claim;
-        }
-    }
-
-    foreach (var claim in EnumerateScopeClaims(user))
-    {
-        var scopes = claim.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (scopes.Any(s => string.Equals(s, scope, StringComparison.Ordinal)))
-        {
-            return true;
-        }
-    }
-
-    return false;
-}
-
 bool ValidateConsentClaims(ClaimsPrincipal principal, Consent consent)
 {
     if (principal is null || consent is null)
@@ -800,96 +751,9 @@ string ComputeConsentTokenHash(string token)
     return Convert.ToHexString(hash);
 }
 
-bool TryParseDetachedJws(string jws, ReadOnlySpan<byte> canonicalJson, out JwsHeader header)
-{
-    header = default!;
-    var parts = jws.Split('.');
-    if (parts.Length != 3)
-    {
-        return false;
-    }
+// JWS parsing moved into Gateway.Api.Helpers.JwsHelpers
 
-    var headerEncoded = parts[0];
-    var payloadEncoded = parts[1];
-    var expectedPayload = Base64UrlEncoder.Encode(canonicalJson.ToArray());
-    if (!string.Equals(payloadEncoded, expectedPayload, StringComparison.Ordinal))
-    {
-        return false;
-    }
+// mapping helpers moved into Gateway.Api.Helpers.ApiHelpers
 
-    try
-    {
-        var headerJson = Encoding.UTF8.GetString(Base64UrlEncoder.DecodeBytes(headerEncoded));
-        header = JsonSerializer.Deserialize<JwsHeader>(headerJson, jwsHeaderSerializerOptions)
-            ?? throw new JsonException("Invalid JWS header.");
-        return !string.IsNullOrWhiteSpace(header.Alg);
-    }
-    catch
-    {
-        return false;
-    }
-}
-
-IEnumerable<object> ProjectKeys(JsonWebKeySet jwks, string tenant)
-{
-    if (jwks?.Keys is null)
-    {
-        yield break;
-    }
-
-    foreach (var key in jwks.Keys)
-    {
-        yield return new
-        {
-            tenant,
-            kty = key.Kty,
-            use = key.Use,
-            alg = string.IsNullOrWhiteSpace(key.Alg) ? "ES256" : key.Alg,
-            kid = key.Kid,
-            crv = key.Crv,
-            x = key.X,
-            y = key.Y
-        };
-    }
-}
-
-ApplicationRecordDto MapApplication(Application application) =>
-    new(
-        application.Id,
-        application.ConsentId,
-        application.AgentTenantId,
-        application.BoardTenantId,
-        application.Status,
-        application.SubmittedAt,
-        application.PayloadHash,
-        application.SubmissionSignature,
-        application.SubmissionKeyId,
-        application.SubmissionAlgorithm,
-        application.Receipt,
-        application.ReceiptSignature,
-        application.ReceiptHash);
-
-ConsentViewDto MapConsent(Consent consent) =>
-    new(
-        consent.Id,
-        consent.AgentTenantId,
-        consent.BoardTenantId,
-        consent.ApprovedByEmail,
-        SplitScopes(consent.Scopes),
-        consent.Status,
-        consent.IssuedAt,
-        consent.ExpiresAt,
-        consent.TokenIssuedAt,
-        consent.TokenExpiresAt,
-        consent.TokenId,
-        consent.TokenKeyId,
-        consent.TokenAlgorithm,
-        consent.RevokedAt);
-
-IReadOnlyList<string> SplitScopes(string scopes) =>
-    string.IsNullOrWhiteSpace(scopes)
-        ? Array.Empty<string>()
-        : scopes.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-sealed record JwsHeader(string? Alg, string? Kid, string? Typ);
+// JWS header record moved into Gateway.Api.Helpers.JwsHelpers
 
