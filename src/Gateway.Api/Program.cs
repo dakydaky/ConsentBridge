@@ -1,3 +1,4 @@
+using Gateway.Api;
 using Gateway.Domain;
 using Gateway.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
@@ -178,22 +179,39 @@ app.MapPost("/oauth/token", async (
     HttpRequest request,
     GatewayDbContext db,
     IClientSecretHasher hasher,
-    IAccessTokenFactory tokenFactory) =>
+    IAccessTokenFactory tokenFactory,
+    [FromBody] ClientCredentialsPayload? payload) =>
 {
-    if (!request.HasFormContentType)
+    string? grantType = null;
+    string? clientId = null;
+    string? clientSecret = null;
+    string? scopeRaw = null;
+
+    if (payload is not null)
     {
-        return Results.Json(new { error = "invalid_request", error_description = "Content-Type must be application/x-www-form-urlencoded" }, statusCode: StatusCodes.Status400BadRequest);
+        grantType = payload.GrantType;
+        clientId = payload.ClientId;
+        clientSecret = payload.ClientSecret;
+        scopeRaw = payload.Scope;
+    }
+    else if (request.HasFormContentType)
+    {
+        var form = await request.ReadFormAsync();
+        grantType = form["grant_type"].ToString();
+        clientId = form["client_id"].ToString();
+        clientSecret = form["client_secret"].ToString();
+        scopeRaw = form.TryGetValue("scope", out var scopeValue) ? scopeValue.ToString() : null;
+    }
+    else
+    {
+        return Results.Json(new { error = "invalid_request", error_description = "Submit as JSON body or application/x-www-form-urlencoded form data." }, statusCode: StatusCodes.Status400BadRequest);
     }
 
-    var form = await request.ReadFormAsync();
-    var grantType = form["grant_type"].ToString();
     if (!string.Equals(grantType, "client_credentials", StringComparison.Ordinal))
     {
         return Results.Json(new { error = "unsupported_grant_type" }, statusCode: StatusCodes.Status400BadRequest);
     }
 
-    var clientId = form["client_id"].ToString();
-    var clientSecret = form["client_secret"].ToString();
     if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret))
     {
         return InvalidClient();
@@ -213,8 +231,8 @@ app.MapPost("/oauth/token", async (
     }
 
     var allowedScopes = credential.Scopes.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-    var requestedScopes = form.TryGetValue("scope", out var scopeValue) && !StringValues.IsNullOrEmpty(scopeValue)
-        ? scopeValue.ToString().Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+    var requestedScopes = !string.IsNullOrWhiteSpace(scopeRaw)
+        ? scopeRaw.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
         : Array.Empty<string>();
 
     if (requestedScopes.Length > 0 && requestedScopes.Except(allowedScopes, StringComparer.Ordinal).Any())
@@ -236,8 +254,10 @@ app.MapPost("/oauth/token", async (
 
     IResult InvalidClient() =>
         Results.Json(new { error = "invalid_client" }, statusCode: StatusCodes.Status401Unauthorized);
+
 })
    .WithTags("Auth")
+   .Accepts<ClientCredentialsPayload>("application/json")
    .WithOpenApi(op =>
    {
        op.Summary = "Client credentials token issuance";
@@ -248,7 +268,7 @@ app.MapGet("/internal/tenants", () => Results.StatusCode(StatusCodes.Status501No
    .WithTags("Internal")
    .WithOpenApi(op =>
    {
-       op.Summary = "Tenant listing (admin) – placeholder";
+       op.Summary = "Tenant listing (admin) - placeholder";
        return op;
    });
 

@@ -75,8 +75,8 @@ This note documents the current end-to-end flows we can showcase via Swagger (`h
 
 - **Obtain access token**
   - Endpoint: `POST /oauth/token`
-  - Content-Type: `application/x-www-form-urlencoded`
-  - Body example:
+  - Content-Type: `application/x-www-form-urlencoded` (or `application/json` when calling from Swagger)
+  - Body example (URL-encoded):
     ```
     grant_type=client_credentials&
     client_id=agent_acme_client&
@@ -94,6 +94,15 @@ This note documents the current end-to-end flows we can showcase via Swagger (`h
     ```
   - Returned JWT includes claims for tenant slug (`sub`), tenant id, tenant type, client id, and scopes.
   - Enforcement on `/v1/applications` is still pending; note this to viewers.
+  - **Swagger tip:** send the body as JSON if you cannot set the form URL-encoded content type:
+    ```json
+    {
+      "grantType": "client_credentials",
+      "clientId": "agent_acme_client",
+      "clientSecret": "agent-secret",
+      "scope": "apply.submit"
+    }
+    ```
 
 - **Consent web flow**
   - Not yet exposed in Swagger.
