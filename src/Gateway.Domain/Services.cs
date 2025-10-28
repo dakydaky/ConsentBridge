@@ -1,3 +1,6 @@
+using System.Threading;
+using System.Threading.Tasks;
+
 namespace Gateway.Domain;
 
 public interface IJwsVerifier
@@ -29,3 +32,9 @@ public interface IAccessTokenFactory
 }
 
 public record AccessTokenResult(string Token, DateTime ExpiresAt, IReadOnlyList<string> Scopes);
+
+public interface IDsrService
+{
+    Task<DsrExportResult?> ExportAsync(string tenantSlug, TenantType? tenantType, string candidateEmail, CancellationToken cancellationToken = default);
+    Task<DsrDeleteResult> DeleteAsync(string tenantSlug, TenantType? tenantType, string candidateEmail, CancellationToken cancellationToken = default);
+}

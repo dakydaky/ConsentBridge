@@ -156,6 +156,22 @@ curl -X POST http://localhost:8080/v1/consents/{consent_id}/revoke \
   -H "Authorization: Bearer $ACCESS_TOKEN" -i
 ```
 
+### 8) Handle Data Subject Requests (DSR)
+```bash
+# Export all data for a candidate (scoped to your tenant)
+curl -s -X POST http://localhost:8080/v1/dsr/export \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"candidateEmail":"alice@example.com"}' | jq
+
+# Delete tenant-scoped data (requires explicit confirm flag)
+curl -s -X POST http://localhost:8080/v1/dsr/delete \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"candidateEmail":"alice@example.com","confirm":true}' | jq
+```
+> Export responses include consents, applications (with provenance hashes/signatures), and consent requests. Delete responses return counts of records removed and whether the candidate record was purged.
+
 ---
 
 ## 📦 Features (MVP)

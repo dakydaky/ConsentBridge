@@ -18,6 +18,7 @@ using Microsoft.AspNetCore.DataProtection;
 using System.IO;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http.HttpResults;
+using System.Threading;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -168,6 +169,65 @@ app.MapGet("/tenants/{slug}/jwks.json", (string slug, ITenantKeyStore keyStore) 
   .WithOpenApi(op =>
   {
       op.Summary = "Tenant-specific signing keys (JWKS)";
+      return op;
+  });
+
+app.MapPost("/v1/dsr/export", async (
+    ClaimsPrincipal user,
+    [FromBody] DsrRequestDto request,
+    IDsrService dsrService,
+    CancellationToken cancellationToken) =>
+{
+    if (request is null || string.IsNullOrWhiteSpace(request.CandidateEmail))
+    {
+        return Results.BadRequest(new { error = "invalid_request", error_description = "candidateEmail is required." });
+    }
+
+    var (tenantSlug, tenantType) = GetTenantContext(user);
+    if (string.IsNullOrWhiteSpace(tenantSlug))
+    {
+        return Results.Unauthorized();
+    }
+
+    var result = await dsrService.ExportAsync(tenantSlug, tenantType, request.CandidateEmail, cancellationToken);
+    return result is null ? Results.NotFound() : Results.Ok(result);
+}).RequireAuthorization("apply.submit")
+  .WithTags("DSR")
+  .WithOpenApi(op =>
+  {
+      op.Summary = "Export candidate data for DSR";
+      return op;
+  });
+
+app.MapPost("/v1/dsr/delete", async (
+    ClaimsPrincipal user,
+    [FromBody] DsrDeleteRequestDto request,
+    IDsrService dsrService,
+    CancellationToken cancellationToken) =>
+{
+    if (request is null || string.IsNullOrWhiteSpace(request.CandidateEmail))
+    {
+        return Results.BadRequest(new { error = "invalid_request", error_description = "candidateEmail is required." });
+    }
+
+    if (!request.Confirm)
+    {
+        return Results.BadRequest(new { error = "confirmation_required", error_description = "Set confirm=true to perform deletion." });
+    }
+
+    var (tenantSlug, tenantType) = GetTenantContext(user);
+    if (string.IsNullOrWhiteSpace(tenantSlug))
+    {
+        return Results.Unauthorized();
+    }
+
+    var result = await dsrService.DeleteAsync(tenantSlug, tenantType, request.CandidateEmail, cancellationToken);
+    return Results.Ok(result);
+}).RequireAuthorization("apply.submit")
+  .WithTags("DSR")
+  .WithOpenApi(op =>
+  {
+      op.Summary = "Delete candidate data for DSR";
       return op;
   });
 

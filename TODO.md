@@ -12,7 +12,7 @@ Consent UX & Auth
 Data & Compliance
 
 Migrations & Seed Data – Formalize EF migrations (already scaffolded) and add seed scripts for demo tenants; include automated dotnet ef database update in container startup once pending-model-changes are eliminated.
-DSR Endpoints – Add export/delete APIs, retention windows, and corresponding database workflows as outlined in specs.
+✅ DSR Endpoints – Export/delete APIs in place; follow-up retention automation and SLA tracking remain outstanding.
 Audit Trails – Extend persistence layer with immutable audit tables and payload hashing strategies expected in the whitepaper.
 Platform Hardening
 

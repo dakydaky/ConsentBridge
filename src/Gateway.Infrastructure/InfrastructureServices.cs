@@ -21,6 +21,7 @@ public static class InfrastructureServices
         services.AddSingleton<IJwsVerifier, JwksJwsVerifier>();
         services.AddSingleton<IClientSecretHasher, DefaultClientSecretHasher>();
         services.AddSingleton<IConsentTokenFactory>(new DemoConsentTokenFactory());
+        services.AddScoped<IDsrService, DsrService>();
 
         services.AddSingleton<IAccessTokenFactory, JwtAccessTokenFactory>();
         services.PostConfigure<JwtAccessTokenOptions>(options =>

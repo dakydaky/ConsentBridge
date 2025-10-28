@@ -130,12 +130,103 @@ paths:
                           type: string
                         kid:
                           type: string
+                        tenant:
+                          type: string
                         crv:
                           type: string
                         x:
                           type: string
                         y:
                           type: string
+
+  /tenants/{slug}/jwks.json:
+    get:
+      summary: Tenant-specific signing keys (JWKS)
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: JSON Web Key Set
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  keys:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        kty:
+                          type: string
+                        use:
+                          type: string
+                        alg:
+                          type: string
+                        kid:
+                          type: string
+                        tenant:
+                          type: string
+                        crv:
+                          type: string
+                        x:
+                          type: string
+                        y:
+                          type: string
+        '404':
+          description: Tenant JWKS not found
+
+  /v1/dsr/export:
+    post:
+      summary: Export candidate data (DSR)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DsrRequest'
+      responses:
+        '200':
+          description: Export payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DsrExportResult'
+        '400':
+          description: Invalid request
+        '401':
+          description: Unauthorized
+        '404':
+          description: Candidate not found
+
+  /v1/dsr/delete:
+    post:
+      summary: Delete candidate data (DSR)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DsrDeleteRequest'
+      responses:
+        '200':
+          description: Deletion summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DsrDeleteResult'
+        '400':
+          description: Confirmation required
+        '401':
+          description: Unauthorized
 
 components:
   securitySchemes:
@@ -330,6 +421,150 @@ components:
           nullable: true
         payloadHash:
           type: string
+
+    DsrRequest:
+      type: object
+      required: [candidateEmail]
+      properties:
+        candidateEmail:
+          type: string
+          format: email
+
+    DsrDeleteRequest:
+      type: object
+      required: [candidateEmail, confirm]
+      properties:
+        candidateEmail:
+          type: string
+          format: email
+        confirm:
+          type: boolean
+
+    DsrExportResult:
+      type: object
+      properties:
+        candidateEmail:
+          type: string
+        candidateCreatedAt:
+          type: string
+          format: date-time
+          nullable: true
+        consents:
+          type: array
+          items:
+            $ref: '#/components/schemas/DsrConsentRecord'
+        applications:
+          type: array
+          items:
+            $ref: '#/components/schemas/DsrApplicationRecord'
+        consentRequests:
+          type: array
+          items:
+            $ref: '#/components/schemas/DsrConsentRequestRecord'
+
+    DsrConsentRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        agentTenantId:
+          type: string
+        boardTenantId:
+          type: string
+        scopes:
+          type: string
+        status:
+          type: string
+        issuedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        revokedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    DsrApplicationRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        consentId:
+          type: string
+          format: uuid
+        agentTenantId:
+          type: string
+        boardTenantId:
+          type: string
+        status:
+          type: string
+        submittedAt:
+          type: string
+          format: date-time
+        payloadHash:
+          type: string
+        submissionSignature:
+          type: string
+          nullable: true
+        submissionKeyId:
+          type: string
+          nullable: true
+        submissionAlgorithm:
+          type: string
+          nullable: true
+        receiptSignature:
+          type: string
+          nullable: true
+        receiptHash:
+          type: string
+          nullable: true
+
+    DsrConsentRequestRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        agentTenantId:
+          type: string
+        boardTenantId:
+          type: string
+        candidateEmail:
+          type: string
+        scopes:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        verifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+        decisionAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    DsrDeleteResult:
+      type: object
+      properties:
+        consentsDeleted:
+          type: integer
+        applicationsDeleted:
+          type: integer
+        consentRequestsDeleted:
+          type: integer
+        candidateDeleted:
+          type: boolean
 
 
 

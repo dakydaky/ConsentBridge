@@ -52,3 +52,55 @@ public record ApplicationRecordDto(
     string? Receipt,
     string? ReceiptSignature,
     string? ReceiptHash);
+
+public record DsrRequestDto(string CandidateEmail);
+public record DsrDeleteRequestDto(string CandidateEmail, bool Confirm);
+
+public record DsrExportResult(
+    string CandidateEmail,
+    DateTime? CandidateCreatedAt,
+    IReadOnlyList<DsrConsentRecord> Consents,
+    IReadOnlyList<DsrApplicationRecord> Applications,
+    IReadOnlyList<DsrConsentRequestRecord> ConsentRequests);
+
+public record DsrConsentRecord(
+    Guid Id,
+    string AgentTenantId,
+    string BoardTenantId,
+    string Scopes,
+    ConsentStatus Status,
+    DateTime IssuedAt,
+    DateTime ExpiresAt,
+    DateTime? RevokedAt);
+
+public record DsrApplicationRecord(
+    Guid Id,
+    Guid ConsentId,
+    string AgentTenantId,
+    string BoardTenantId,
+    string Status,
+    DateTime SubmittedAt,
+    string PayloadHash,
+    string? SubmissionSignature,
+    string? SubmissionKeyId,
+    string? SubmissionAlgorithm,
+    string? ReceiptSignature,
+    string? ReceiptHash);
+
+public record DsrConsentRequestRecord(
+    Guid Id,
+    string AgentTenantId,
+    string BoardTenantId,
+    string CandidateEmail,
+    string Scopes,
+    ConsentRequestStatus Status,
+    DateTime CreatedAt,
+    DateTime ExpiresAt,
+    DateTime? VerifiedAt,
+    DateTime? DecisionAt);
+
+public record DsrDeleteResult(
+    int ConsentsDeleted,
+    int ApplicationsDeleted,
+    int ConsentRequestsDeleted,
+    bool CandidateDeleted);
