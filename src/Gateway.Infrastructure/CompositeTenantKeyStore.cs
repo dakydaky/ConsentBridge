@@ -1,5 +1,6 @@
 using Gateway.Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Gateway.Infrastructure;
@@ -7,12 +8,12 @@ namespace Gateway.Infrastructure;
 public sealed class CompositeTenantKeyStore : ITenantKeyStore
 {
     private readonly ConfigurationTenantKeyStore _configStore;
-    private readonly IDbContextFactory<GatewayDbContext> _dbFactory;
+    private readonly IServiceScopeFactory _scopeFactory;
 
-    public CompositeTenantKeyStore(ConfigurationTenantKeyStore configStore, IDbContextFactory<GatewayDbContext> dbFactory)
+    public CompositeTenantKeyStore(ConfigurationTenantKeyStore configStore, IServiceScopeFactory scopeFactory)
     {
         _configStore = configStore;
-        _dbFactory = dbFactory;
+        _scopeFactory = scopeFactory;
     }
 
     public bool TryGetKeys(string tenantSlug, out JsonWebKeySet? jwks)
@@ -35,7 +36,8 @@ public sealed class CompositeTenantKeyStore : ITenantKeyStore
             map[pair.Key] = CloneSet(pair.Value);
         }
 
-        using var db = _dbFactory.CreateDbContext();
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<GatewayDbContext>();
         var records = db.TenantKeys.AsNoTracking()
             .Where(k => k.Purpose == TenantKeyPurpose.ConsentToken && k.Status != TenantKeyStatus.Retired)
             .Join(db.Tenants.AsNoTracking(),
@@ -69,7 +71,8 @@ public sealed class CompositeTenantKeyStore : ITenantKeyStore
             }
         }
 
-        using var db = _dbFactory.CreateDbContext();
+        using var scope = _scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<GatewayDbContext>();
         var keys = db.TenantKeys.AsNoTracking()
             .Where(k => k.Purpose == TenantKeyPurpose.ConsentToken &&
                         k.Status != TenantKeyStatus.Retired &&

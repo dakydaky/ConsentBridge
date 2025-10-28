@@ -2,6 +2,8 @@
 
 Welcome! These curated “choose‑your‑perspective” guides help you demo the platform directly from `http://localhost:8080/swagger`. Pick a persona, follow the steps, and point stakeholders at the parts they care about most.
 
+> Need to show off debug tooling (e.g., on-demand key rotation)? See `swagger-demo-journeys-debug.md`.
+
 ---
 
 ## 🕵️ Agent Operator — “Can I submit safely?”

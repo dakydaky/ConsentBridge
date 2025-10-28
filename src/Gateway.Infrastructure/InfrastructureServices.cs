@@ -22,12 +22,14 @@ public static class InfrastructureServices
         services.AddScoped<ITenantKeyStore>(sp =>
         {
             var configStore = sp.GetRequiredService<ConfigurationTenantKeyStore>();
-            var factory = sp.GetRequiredService<IDbContextFactory<GatewayDbContext>>();
-            return new CompositeTenantKeyStore(configStore, factory);
+            var scopeFactory = sp.GetRequiredService<IServiceScopeFactory>();
+            return new CompositeTenantKeyStore(configStore, scopeFactory);
         });
         services.AddScoped<IJwsVerifier, JwksJwsVerifier>();
         services.AddSingleton<IClientSecretHasher, DefaultClientSecretHasher>();
         services.AddScoped<IConsentTokenFactory, JwtConsentTokenFactory>();
+        services.AddScoped<IConsentKeyRotator>(sp =>
+            (JwtConsentTokenFactory)sp.GetRequiredService<IConsentTokenFactory>());
         services.AddScoped<IDsrService, DsrService>();
         services.Configure<RetentionOptions>(configuration.GetSection("Retention"));
         services.Configure<ConsentTokenOptions>(configuration.GetSection("ConsentTokens"));
@@ -47,8 +49,6 @@ public static class InfrastructureServices
                 throw new InvalidOperationException("Auth:Jwt:SigningKey must be at least 256 bits.");
             }
         });
-
-        services.AddDbContextFactory<GatewayDbContext>();
 
         return services;
     }

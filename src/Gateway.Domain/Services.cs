@@ -40,6 +40,11 @@ public interface IAccessTokenFactory
 
 public record AccessTokenResult(string Token, DateTime ExpiresAt, IReadOnlyList<string> Scopes);
 
+public interface IConsentKeyRotator
+{
+    Task<TenantKey> RotateAsync(string tenantSlug, CancellationToken cancellationToken = default);
+}
+
 public interface IDsrService
 {
     Task<DsrExportResult?> ExportAsync(string tenantSlug, TenantType? tenantType, string candidateEmail, CancellationToken cancellationToken = default);

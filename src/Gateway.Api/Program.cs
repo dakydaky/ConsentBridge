@@ -128,6 +128,41 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+
+    app.MapPost("/debug/tenants/{slug}/rotate-consent-key", async (
+        string slug,
+        IConsentKeyRotator rotator,
+        ILogger<Program> logger,
+        CancellationToken cancellationToken) =>
+    {
+        try
+        {
+            var key = await rotator.RotateAsync(slug, cancellationToken);
+            return Results.Ok(new
+            {
+                tenant = slug,
+                keyId = key.KeyId,
+                status = key.Status.ToString(),
+                activatedAt = key.ActivatedAt,
+                expiresAt = key.ExpiresAt
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            logger.LogWarning(ex, "Debug rotate failed for tenant {Tenant}", slug);
+            return Results.NotFound(new { error = "tenant_not_found" });
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { error = "invalid_request", error_description = ex.Message });
+        }
+    }).WithTags("Debug")
+      .WithOpenApi(op =>
+      {
+          op.Summary = "DEV ONLY: Force consent signing key rotation";
+          op.Description = "For development and testing, rotates the consent signing key for the given tenant.";
+          return op;
+      });
 }
 
 app.UseStaticFiles();

@@ -47,7 +47,7 @@ public sealed class DefaultClientSecretHasher : IClientSecretHasher
     }
 }
 
-public sealed class JwtConsentTokenFactory : IConsentTokenFactory
+public sealed class JwtConsentTokenFactory : IConsentTokenFactory, IConsentKeyRotator
 {
     private const string ProtectorPurpose = "ConsentBridge.TenantKeys";
     private const string DefaultAlgorithm = SecurityAlgorithms.EcdsaSha256;
@@ -135,6 +135,28 @@ public sealed class JwtConsentTokenFactory : IConsentTokenFactory
         _logger.LogInformation("Issued consent token {TokenId} for consent {ConsentId} using key {KeyId}", jti, consent.Id, signingKey.KeyId);
 
         return new ConsentTokenIssueResult(tokenString, jti, now, expires, signingKey.KeyId, signingKey.Algorithm, tokenHash);
+    }
+
+    public async Task<TenantKey> RotateAsync(string tenantSlug, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(tenantSlug))
+        {
+            throw new ArgumentException("Tenant slug must be provided.", nameof(tenantSlug));
+        }
+
+        var tenant = await _db.Tenants.FirstOrDefaultAsync(t => t.Slug == tenantSlug, cancellationToken)
+            ?? throw new InvalidOperationException($"Tenant {tenantSlug} not found.");
+
+        var now = DateTime.UtcNow;
+        var current = await _db.TenantKeys
+            .Where(k => k.TenantId == tenant.Id && k.Purpose == TenantKeyPurpose.ConsentToken && k.Status == TenantKeyStatus.Active)
+            .OrderByDescending(k => k.ActivatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var newKey = RotateKey(tenant, current, now);
+        await _db.SaveChangesAsync(cancellationToken);
+        _logger.LogInformation("Debug rotation triggered for tenant {TenantSlug}. New key {KeyId} active until {Expires}.", tenantSlug, newKey.KeyId, newKey.ExpiresAt);
+        return newKey;
     }
 
     private TenantKey EnsureActiveKey(Tenant tenant, DateTime now)
