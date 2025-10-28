@@ -19,4 +19,10 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Gateway.Domain\Gateway.Domain.csproj" />
+    <ProjectReference Include="..\Gateway.Infrastructure\Gateway.Infrastructure.csproj" />
+    <ProjectReference Include="..\MockBoard.Adapter\MockBoard.Adapter.csproj" />
+  </ItemGroup>
+
 </Project>

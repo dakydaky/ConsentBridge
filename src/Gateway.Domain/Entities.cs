@@ -43,6 +43,8 @@ public class Application
     public ApplicationStatus Status { get; set; }
     public DateTime SubmittedAt { get; set; }
     public string? Receipt { get; set; }
+    public string? ReceiptSignature { get; set; }
+    public string? ReceiptHash { get; set; }
     public string PayloadHash { get; set; } = default!;
 }
 

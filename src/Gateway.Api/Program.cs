@@ -227,7 +227,8 @@ app.MapPost("/v1/applications", async (
     [FromBody] ApplyPayloadDto payload,
     GatewayDbContext db,
     IHttpClientFactory httpFactory,
-    IJwsVerifier verifier) =>
+    IJwsVerifier verifier,
+    ILogger<Program> logger) =>
 {
     if (payload is null)
     {
@@ -289,10 +290,35 @@ app.MapPost("/v1/applications", async (
 
     if (resp.IsSuccessStatusCode)
     {
-        appRec.Status = ApplicationStatus.Accepted;
-        appRec.Receipt = await resp.Content.ReadAsStringAsync();
-        await db.SaveChangesAsync();
-        return Results.Accepted($"/v1/applications/{appRec.Id}", new { id = appRec.Id, status = appRec.Status });
+        BoardReceiptEnvelope? envelope = null;
+        try
+        {
+            envelope = await resp.Content.ReadFromJsonAsync<BoardReceiptEnvelope>(ReceiptJson.SerializerOptions);
+        }
+        catch (JsonException ex)
+        {
+            logger.LogWarning(ex, "Failed to deserialize board receipt for application {ApplicationId}", appRec.Id);
+        }
+
+        if (envelope?.Receipt is null || string.IsNullOrWhiteSpace(envelope.ReceiptSignature))
+        {
+            logger.LogWarning("Board receipt missing payload or signature for application {ApplicationId}", appRec.Id);
+        }
+        else
+        {
+            var receiptBytes = ReceiptJson.SerializePayload(envelope.Receipt);
+            if (verifier.VerifyDetached(receiptBytes, envelope.ReceiptSignature, consent.BoardTenantId))
+            {
+                appRec.Status = ApplicationStatus.Accepted;
+                appRec.Receipt = Encoding.UTF8.GetString(receiptBytes);
+                appRec.ReceiptSignature = envelope.ReceiptSignature;
+                appRec.ReceiptHash = Convert.ToHexString(SHA256.HashData(receiptBytes));
+                await db.SaveChangesAsync();
+                return Results.Accepted($"/v1/applications/{appRec.Id}", new { id = appRec.Id, status = appRec.Status });
+            }
+
+            logger.LogWarning("Receipt signature validation failed for application {ApplicationId}", appRec.Id);
+        }
     }
 
     appRec.Status = ApplicationStatus.Failed;

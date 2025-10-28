@@ -289,5 +289,11 @@ components:
         receipt:
           type: string
           nullable: true
+        receiptSignature:
+          type: string
+          nullable: true
+        receiptHash:
+          type: string
+          nullable: true
         payloadHash:
           type: string

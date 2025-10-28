@@ -3,9 +3,11 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
 COPY src/MockBoard.Adapter/MockBoard.Adapter.csproj ./MockBoard.Adapter/
+COPY src/Gateway.Domain/Gateway.Domain.csproj ./Gateway.Domain/
 RUN dotnet restore ./MockBoard.Adapter/MockBoard.Adapter.csproj
 
 COPY src/MockBoard.Adapter/ ./MockBoard.Adapter/
+COPY src/Gateway.Domain/ ./Gateway.Domain/
 RUN dotnet publish ./MockBoard.Adapter/MockBoard.Adapter.csproj -c Release -o /app/publish
 
 # Runtime stage

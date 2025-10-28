@@ -1,3 +1,7 @@
+using System.Text.Json;
+using Gateway.Domain;
+using Microsoft.Extensions.Options;
+using MockBoard.Adapter;
 using MockBoard.Adapter.Services;
 using Serilog;
 
@@ -6,7 +10,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog((ctx, lc) => lc.ReadFrom.Configuration(ctx.Configuration).WriteTo.Console());
 
 builder.Services.AddRazorPages();
+builder.Services.Configure<MockBoardOptions>(builder.Configuration.GetSection("MockBoard"));
 builder.Services.AddSingleton<ApplicationFeed>();
+builder.Services.AddSingleton<ReceiptSigner>();
 
 var app = builder.Build();
 
@@ -16,31 +22,53 @@ app.MapRazorPages();
 
 app.MapGet("/health", () => Results.Ok(new { status = "mockboard-ok" }));
 
-app.MapPost("/v1/mock/applications", async (HttpRequest req, ApplicationFeed feed) =>
+app.MapPost("/v1/mock/applications", (
+    ApplicationSubmission submission,
+    ApplicationFeed feed,
+    ReceiptSigner signer,
+    IOptions<MockBoardOptions> boardOptions) =>
 {
-    using var reader = new StreamReader(req.Body);
-    var body = await reader.ReadToEndAsync();
-    // Real implementation would verify signature & consent.
-    var entry = new MockBoard.Adapter.Services.ApplicationEntry(
-        Guid.NewGuid().ToString(),
-        "alice@example.com",
-        "Backend Engineer",
+    var receivedAt = DateTime.UtcNow;
+    var candidateEmail = TryGetCandidateEmail(submission.Payload) ?? "alice@example.com";
+    var jobTitle = TryGetJobTitle(submission.Payload) ?? "Backend Engineer";
+
+    var entry = new ApplicationEntry(
+        submission.ApplicationId,
+        candidateEmail,
+        jobTitle,
         "Accepted",
-        DateTime.UtcNow
-    );
+        receivedAt);
     feed.Add(entry);
 
-    var receipt = new
-    {
-        spec = "consent-apply/v0.1",
-        application_id = entry.Id,
-        board_id = "mockboard_eu",
-        status = "accepted",
-        received_at = entry.ReceivedAt,
-        board_ref = $"MB-{Random.Shared.Next(100000, 999999)}"
-    };
-    return Results.Ok(receipt);
+    var payload = new BoardReceiptPayload(
+        Spec: "consent-apply/v0.1",
+        ApplicationId: submission.ApplicationId,
+        BoardId: boardOptions.Value.BoardId,
+        JobExternalId: submission.JobExternalId,
+        CandidateId: submission.CandidateId,
+        Status: "accepted",
+        ReceivedAt: receivedAt,
+        BoardRef: $"MB-{Random.Shared.Next(100000, 999999)}");
+
+    var signature = signer.Sign(payload, out _);
+    var envelope = new BoardReceiptEnvelope(payload, signature);
+    return Results.Ok(envelope);
 });
 
 app.Run("http://0.0.0.0:8081");
+
+static string? TryGetCandidateEmail(JsonElement payload) =>
+    payload.TryGetProperty("candidate", out var candidate) &&
+    candidate.TryGetProperty("contact", out var contact) &&
+    contact.TryGetProperty("email", out var email) &&
+    email.ValueKind == JsonValueKind.String
+        ? email.GetString()
+        : null;
+
+static string? TryGetJobTitle(JsonElement payload) =>
+    payload.TryGetProperty("job", out var job) &&
+    job.TryGetProperty("title", out var title) &&
+    title.ValueKind == JsonValueKind.String
+        ? title.GetString()
+        : null;
 

@@ -59,7 +59,7 @@ This note documents the current end-to-end flows we can showcase via Swagger (`h
 
 4. **Review via API**
    - Endpoint: `GET /v1/applications/{id}`
-   - Expected response: `200 OK` with receipt and audit fields showing the forwarded application.
+   - Expected response: `200 OK` with receipt, `receiptSignature`, and `receiptHash` metadata showing the forwarded application.
 
 ---
 
