@@ -168,7 +168,6 @@ curl -X POST http://localhost:8080/v1/consents/{consent_id}/revoke \
 ---
 
 ## 🔌 API Surface (minimal)
-## ?? API Surface (minimal)
 - `POST /v1/consent-requests` → initiate consent flow (OTP + web approval)
 - `POST /v1/applications` → submit **detached-JWS** signed ApplyPayload
 - `GET /v1/consents` → list consents for the current agent
@@ -176,7 +175,8 @@ curl -X POST http://localhost:8080/v1/consents/{consent_id}/revoke \
 - `GET /v1/applications/{id}` → retrieve application status
 - `POST /v1/consents/{id}/revoke` → revoke consent
 - `POST /oauth/token` → client credentials grant (hashed secrets + JWT access tokens)
-- `GET /.well-known/jwks.json` → platform public keys (planned)
+- `GET /.well-known/jwks.json` → aggregated platform JWKS
+- `GET /tenants/{slug}/jwks.json` → per-tenant JWKS (slug = tenant slug)
 
 ## 🔐 GDPR & Privacy
 - **Explicit consent** with scopes and expiry

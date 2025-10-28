@@ -139,16 +139,7 @@ app.MapGet("/.well-known/jwks.json", (ITenantKeyStore keyStore) =>
     var response = new
     {
         keys = keyStore.GetAll()
-            .SelectMany(entry => entry.Value.Keys.Select(k => new
-            {
-                kty = k.Kty,
-                use = k.Use,
-                alg = string.IsNullOrWhiteSpace(k.Alg) ? "ES256" : k.Alg,
-                kid = k.Kid,
-                crv = k.Crv,
-                x = k.X,
-                y = k.Y
-            }))
+            .SelectMany(entry => ProjectKeys(entry.Value, entry.Key))
     };
 
     return Results.Json(response);
@@ -156,6 +147,27 @@ app.MapGet("/.well-known/jwks.json", (ITenantKeyStore keyStore) =>
   .WithOpenApi(op =>
   {
       op.Summary = "Tenant signing keys (JWKS)";
+      return op;
+  });
+
+app.MapGet("/tenants/{slug}/jwks.json", (string slug, ITenantKeyStore keyStore) =>
+{
+    if (!keyStore.TryGetKeys(slug, out var jwks) || jwks is null)
+    {
+        return Results.NotFound();
+    }
+
+    var keys = ProjectKeys(jwks, slug).ToArray();
+    if (keys.Length == 0)
+    {
+        return Results.NotFound();
+    }
+
+    return Results.Json(new { keys });
+}).WithTags("Public")
+  .WithOpenApi(op =>
+  {
+      op.Summary = "Tenant-specific signing keys (JWKS)";
       return op;
   });
 
@@ -581,6 +593,29 @@ bool TryParseDetachedJws(string jws, ReadOnlySpan<byte> canonicalJson, out JwsHe
     catch
     {
         return false;
+    }
+}
+
+IEnumerable<object> ProjectKeys(JsonWebKeySet jwks, string tenant)
+{
+    if (jwks?.Keys is null)
+    {
+        yield break;
+    }
+
+    foreach (var key in jwks.Keys)
+    {
+        yield return new
+        {
+            tenant,
+            kty = key.Kty,
+            use = key.Use,
+            alg = string.IsNullOrWhiteSpace(key.Alg) ? "ES256" : key.Alg,
+            kid = key.Kid,
+            crv = key.Crv,
+            x = key.X,
+            y = key.Y
+        };
     }
 }
 

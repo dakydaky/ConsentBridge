@@ -73,7 +73,8 @@ Welcome! These curated “choose‑your‑perspective” guides help you demo th
    - Use the portal page `http://localhost:8080/applications/{id}` to show the signed receipt JSON and matching signature.
 
 4. **🔑 Confirm key provenance**
-   - `GET /.well-known/jwks.json`
+   - `GET /.well-known/jwks.json` (all tenants)
+   - `GET /tenants/mockboard_eu/jwks.json` (board-specific)
    - Demonstrate that MockBoard’s public key (`kid: mockboard-key`) is published alongside the agent key.
 
 5. **🧭 Rely on provenance**
