@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using Gateway.Api;
@@ -29,7 +30,12 @@ builder.Services.AddDbContext<GatewayDbContext>(opts =>
 builder.Services.Configure<JwtAccessTokenOptions>(builder.Configuration.GetSection("Auth:Jwt"));
 var jwtOptions = builder.Configuration.GetSection("Auth:Jwt").Get<JwtAccessTokenOptions>()
     ?? throw new InvalidOperationException("Auth:Jwt configuration missing.");
-builder.Services.AddGatewayInfrastructure();
+builder.Services.AddGatewayInfrastructure(builder.Configuration);
+
+var payloadSerializerOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+{
+    WriteIndented = false
+};
 
 // Http client for the MockBoard adapter
 builder.Services.AddHttpClient("mockboard", client =>
@@ -121,9 +127,8 @@ app.MapPost("/v1/consent-requests", async (
     IClientSecretHasher hasher,
     ILogger<Program> logger) =>
 {
-    var tenantSlug = user.FindFirstValue("sub") ?? string.Empty;
-    var tenantType = user.FindFirstValue("tenant_type");
-    if (string.IsNullOrEmpty(tenantSlug) || !string.Equals(tenantType, nameof(TenantType.Agent), StringComparison.Ordinal))
+    var (tenantSlug, tenantType) = GetTenantContext(user);
+    if (tenantSlug is null || tenantType != TenantType.Agent)
     {
         return Results.Forbid();
     }
@@ -138,8 +143,10 @@ app.MapPost("/v1/consent-requests", async (
     {
         return Results.BadRequest(new { error = "invalid_candidate_email" });
     }
-    var scopes = dto.Scopes is { Count: > 0 }
-        ? string.Join(' ', dto.Scopes)
+
+    var scopesList = dto.Scopes?.Where(s => !string.IsNullOrWhiteSpace(s)).ToArray();
+    var scopes = scopesList is { Length: > 0 }
+        ? string.Join(' ', scopesList!)
         : "apply:submit";
 
     var now = DateTime.UtcNow;
@@ -171,19 +178,67 @@ app.MapPost("/v1/consent-requests", async (
     });
 }).RequireAuthorization("apply.submit");
 
+app.MapGet("/v1/consents", async (
+    ClaimsPrincipal user,
+    [FromQuery] int? take,
+    GatewayDbContext db) =>
+{
+    var (tenantSlug, tenantType) = GetTenantContext(user);
+    if (tenantSlug is null || tenantType != TenantType.Agent)
+    {
+        return Results.Forbid();
+    }
+
+    var pageSize = Math.Clamp(take ?? 20, 1, 100);
+    var consents = await db.Consents.AsNoTracking()
+        .Where(c => c.AgentTenantId == tenantSlug)
+        .OrderByDescending(c => c.IssuedAt)
+        .Take(pageSize)
+        .ToListAsync();
+
+    return Results.Ok(consents.Select(MapConsent));
+}).RequireAuthorization("apply.submit");
+
+app.MapGet("/v1/consents/{id:guid}", async (
+    ClaimsPrincipal user,
+    Guid id,
+    GatewayDbContext db) =>
+{
+    var (tenantSlug, tenantType) = GetTenantContext(user);
+    if (tenantSlug is null || tenantType != TenantType.Agent)
+    {
+        return Results.Forbid();
+    }
+
+    var consent = await db.Consents.AsNoTracking()
+        .FirstOrDefaultAsync(c => c.Id == id);
+
+    if (consent is null || !string.Equals(consent.AgentTenantId, tenantSlug, StringComparison.Ordinal))
+    {
+        return Results.NotFound();
+    }
+
+    return Results.Ok(MapConsent(consent));
+}).RequireAuthorization("apply.submit");
+
 // Submit Application (consent + JWS validation are stubbed for demo)
 app.MapPost("/v1/applications", async (
     [FromHeader(Name = "X-JWS-Signature")] string? jws,
     [FromBody] ApplyPayloadDto payload,
     GatewayDbContext db,
-    IHttpClientFactory httpFactory) =>
+    IHttpClientFactory httpFactory,
+    IJwsVerifier verifier) =>
 {
     if (payload is null)
     {
         return Results.BadRequest();
     }
 
-    // Validate consent token format
+    if (string.IsNullOrWhiteSpace(jws))
+    {
+        return Results.BadRequest(new { error = "missing_signature" });
+    }
+
     if (string.IsNullOrWhiteSpace(payload.ConsentToken) || !payload.ConsentToken.StartsWith("ctok:"))
     {
         return Results.Unauthorized();
@@ -201,6 +256,14 @@ app.MapPost("/v1/applications", async (
         return Results.Forbid();
     }
 
+    var payloadBytes = JsonSerializer.SerializeToUtf8Bytes(payload, payloadSerializerOptions);
+    if (!verifier.VerifyDetached(payloadBytes, jws, consent.AgentTenantId))
+    {
+        return Results.BadRequest(new { error = "invalid_signature" });
+    }
+
+    var payloadHash = Convert.ToHexString(SHA256.HashData(payloadBytes));
+
     var appRec = new Application
     {
         Id = Guid.NewGuid(),
@@ -209,7 +272,7 @@ app.MapPost("/v1/applications", async (
         BoardTenantId = consent.BoardTenantId,
         Status = ApplicationStatus.Pending,
         SubmittedAt = DateTime.UtcNow,
-        PayloadHash = Guid.NewGuid().ToString("N")
+        PayloadHash = payloadHash
     };
     db.Applications.Add(appRec);
     await db.SaveChangesAsync();
@@ -357,15 +420,29 @@ app.MapGet("/internal/tenants", () => Results.StatusCode(StatusCodes.Status501No
 app.MapRazorPages();
 app.Run();
 
-static string GenerateVerificationCode()
+string GenerateVerificationCode()
 {
     var value = RandomNumberGenerator.GetInt32(0, 1_000_000);
     return value.ToString("D6");
 }
 
-static bool HasScope(ClaimsPrincipal user, string scope)
+(string? slug, TenantType? type) GetTenantContext(ClaimsPrincipal user)
 {
-    static IEnumerable<Claim> EnumerateScopeClaims(ClaimsPrincipal principal)
+    var slug = user.FindFirstValue("sub");
+    var typeValue = user.FindFirstValue("tenant_type");
+    if (string.IsNullOrWhiteSpace(slug))
+    {
+        return (null, null);
+    }
+
+    return Enum.TryParse<TenantType>(typeValue, out var parsed)
+        ? (slug, parsed)
+        : (slug, null);
+}
+
+bool HasScope(ClaimsPrincipal user, string scope)
+{
+    IEnumerable<Claim> EnumerateScopeClaims(ClaimsPrincipal principal)
     {
         foreach (var claim in principal.FindAll("scope"))
         {
@@ -388,3 +465,23 @@ static bool HasScope(ClaimsPrincipal user, string scope)
 
     return false;
 }
+
+ConsentViewDto MapConsent(Consent consent) =>
+    new(
+        consent.Id,
+        consent.AgentTenantId,
+        consent.BoardTenantId,
+        consent.ApprovedByEmail,
+        SplitScopes(consent.Scopes),
+        consent.Status,
+        consent.IssuedAt,
+        consent.ExpiresAt,
+        consent.TokenExpiresAt,
+        consent.TokenId,
+        consent.RevokedAt);
+
+IReadOnlyList<string> SplitScopes(string scopes) =>
+    string.IsNullOrWhiteSpace(scopes)
+        ? Array.Empty<string>()
+        : scopes.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+

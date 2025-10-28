@@ -28,8 +28,9 @@ This note documents the current end-to-end flows we can showcase via Swagger (`h
    - Enter the OTP, verify your email, and approve the consent. The success page displays the `consent_token`.
 
 3. **Submit an application**
+   - Generate the detached JWS signature (use `demo.ps1` with your payload) and include it as `X-JWS-Signature`.
    - Endpoint: `POST /v1/applications`
-   - Headers: `Authorization: Bearer <token>` and `X-JWS-Signature: demo.signature`
+   - Headers: `Authorization: Bearer <token>` and `X-JWS-Signature: detached JWS`
    - Body example (swap in real `ConsentToken`):
      ```json
      {
@@ -54,9 +55,9 @@ This note documents the current end-to-end flows we can showcase via Swagger (`h
      }
      ```
    - Expected response: `202 Accepted` with application `id` and `status: Accepted`.
-   - Behind the scenes: record is persisted with receipt payload from MockBoard; signature verification is currently stubbed (AcceptAllVerifier).
+   - Behind the scenes: record is persisted with receipt payload from MockBoard; signature verification is now enforced.
 
-4. **Retrieve application status**
+4. **Review via API**
    - Endpoint: `GET /v1/applications/{id}`
    - Expected response: `200 OK` with receipt and audit fields showing the forwarded application.
 
@@ -122,6 +123,8 @@ Track progress in:
 - `TODO.md` (Consent UX & Auth section)
 
 Update this file after each milestone to keep product demos and investor walkthroughs consistent.
+
+
 
 
 

@@ -106,35 +106,50 @@ echo "Consent request ID: $REQUEST_ID"
 Check the API logs for the one-time code (OTP) that is logged for demo purposes, then open `http://localhost:8080/consent/$REQUEST_ID`, enter the OTP, and approve the request. Copy the consent token shown on the success screen (`TOKEN`).
 
 ### 5) Submit a (signed) application
+1. Save the payload you want to send (update `ConsentToken` and other fields as needed).
+   ```bash
+   cat <<'EOF' > payload.json
+   {
+     "ConsentToken": "ctok:REPLACE_WITH_TOKEN_FROM_WEB",
+     "Candidate": {
+       "Id": "cand_123",
+       "Contact": {"Email": "alice@example.com", "Phone": "+45 1234"},
+       "Pii": {"FirstName": "Alice", "LastName": "Larsen"},
+       "Cv": {"Url": "https://example/cv.pdf", "Sha256": "deadbeef"}
+     },
+     "Job": {
+       "ExternalId": "mock:98765",
+       "Title": "Backend Engineer",
+       "Company": "ACME GmbH",
+       "ApplyEndpoint": "quick-apply"
+     },
+     "Materials": {
+       "CoverLetter": {"Text": "Hello MockBoard!"},
+       "Answers": [{"QuestionId": "q_legal_work", "AnswerText": "Yes"}]
+     },
+     "Meta": {"Locale": "de-DE", "UserAgent": "agent/0.1", "Ts": "2025-10-27T10:15:00Z"}
+   }
+   EOF
+   ```
+2. Generate the detached JWS signature.
+   ```powershell
+   $signature = (pwsh ./demo.ps1 -PayloadPath payload.json -Kid agent_acme -Secret agent-signing-secret | Select-Object -Last 1)
+   ```
+3. Send the application.
+   ```bash
+   curl -s -X POST http://localhost:8080/v1/applications \
+     -H "Authorization: Bearer $ACCESS_TOKEN" \
+     -H "Content-Type: application/json" \
+     -H "X-JWS-Signature: $signature" \
+     --data-binary @payload.json | jq
+   ```
+### 6) Get consent details
 ```bash
-TOKEN=ctok:REPLACE_WITH_TOKEN_FROM_WEB
-curl -s -X POST http://localhost:8080/v1/applications \
-  -H "Authorization: Bearer $ACCESS_TOKEN" \
-  -H 'Content-Type: application/json' \
-  -H 'X-JWS-Signature: demo.signature' \
-  -d '{
-    "ConsentToken": "'"$TOKEN"'",
-    "Candidate": {
-      "Id": "cand_123",
-      "Contact": {"Email": "alice@example.com", "Phone": "+45 1234"},
-      "Pii": {"FirstName": "Alice", "LastName": "Larsen"},
-      "Cv": {"Url": "https://example/cv.pdf", "Sha256": "deadbeef"}
-    },
-    "Job": {
-      "ExternalId": "mock:98765",
-      "Title": "Backend Engineer",
-      "Company": "ACME GmbH",
-      "ApplyEndpoint": "quick-apply"
-    },
-    "Materials": {
-      "CoverLetter": {"Text": "Hello!"},
-      "Answers": [{"QuestionId": "q_legal_work", "AnswerText": "Yes"}]
-    },
-    "Meta": {"Locale": "de-DE", "UserAgent": "agent/0.1", "Ts": "2025-10-27T10:15:00Z"}
-  }'
+curl -s http://localhost:8080/v1/consents/$CONSENT_ID \
+  -H "Authorization: Bearer $ACCESS_TOKEN" | jq
 ```
 
-### 6) Revoke consent
+### 7) Revoke consent
 ```bash
 curl -X POST http://localhost:8080/v1/consents/{consent_id}/revoke \
   -H "Authorization: Bearer $ACCESS_TOKEN" -i
@@ -152,16 +167,15 @@ curl -X POST http://localhost:8080/v1/consents/{consent_id}/revoke \
 ---
 
 ## 🔌 API Surface (minimal)
-- `POST /v1/consent-requests` -> initiate consent flow (OTP + web approval)
-- `POST /v1/applications` → submit **detached‑JWS** signed ApplyPayload
+## ?? API Surface (minimal)
+- `POST /v1/consent-requests` → initiate consent flow (OTP + web approval)
+- `POST /v1/applications` → submit **detached-JWS** signed ApplyPayload
+- `GET /v1/consents` → list consents for the current agent
+- `GET /v1/consents/{id}` → retrieve consent details
 - `GET /v1/applications/{id}` → retrieve application status
 - `POST /v1/consents/{id}/revoke` → revoke consent
-- `POST /oauth/token`  → client credentials grant (hashed secrets + JWT access tokens)
+- `POST /oauth/token` → client credentials grant (hashed secrets + JWT access tokens)
 - `GET /.well-known/jwks.json` → platform public keys (planned)
-
-See **`docs/api/openapi.yaml`** for full schemas.
-
----
 
 ## 🔐 GDPR & Privacy
 - **Explicit consent** with scopes and expiry
@@ -224,6 +238,8 @@ PRs welcome! Please:
 
 ## 🙌 Credits
 Built with ❤️ for EU job seekers, boards, and ATS vendors who want **trust without friction**.
+
+
 
 
 

@@ -24,3 +24,16 @@ public record CoverLetterDto(string Text);
 public record AnswerDto(string QuestionId, string AnswerText);
 
 public record MetaDto(string Locale, string UserAgent, DateTime Ts);
+
+public record ConsentViewDto(
+    Guid Id,
+    string AgentTenantId,
+    string BoardTenantId,
+    string? CandidateEmail,
+    IReadOnlyList<string> Scopes,
+    ConsentStatus Status,
+    DateTime IssuedAt,
+    DateTime ExpiresAt,
+    DateTime TokenExpiresAt,
+    Guid TokenId,
+    DateTime? RevokedAt);

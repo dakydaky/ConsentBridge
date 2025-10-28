@@ -1,6 +1,7 @@
 using System;
 using System.Text;
 using Gateway.Domain;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -8,9 +9,10 @@ namespace Gateway.Infrastructure;
 
 public static class InfrastructureServices
 {
-    public static IServiceCollection AddGatewayInfrastructure(this IServiceCollection services)
+    public static IServiceCollection AddGatewayInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddSingleton<IJwsVerifier, AcceptAllVerifier>();
+        services.AddSingleton<ITenantSigningSecretProvider, ConfigurationTenantSigningSecretProvider>(_ => new ConfigurationTenantSigningSecretProvider(configuration));
+        services.AddSingleton<IJwsVerifier, Hs256JwsVerifier>();
         services.AddSingleton<IClientSecretHasher, DefaultClientSecretHasher>();
         services.AddSingleton<IConsentTokenFactory>(new DemoConsentTokenFactory());
 
