@@ -12,5 +12,6 @@ RUN dotnet publish ./MockBoard.Adapter/MockBoard.Adapter.csproj -c Release -o /a
 FROM mcr.microsoft.com/dotnet/aspnet:9.0
 WORKDIR /app
 ENV ASPNETCORE_URLS=http://+:8081
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/publish .
 ENTRYPOINT ["dotnet", "MockBoard.Adapter.dll"]
