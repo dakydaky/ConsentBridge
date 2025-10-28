@@ -1,11 +1,8 @@
-using System;
 using System.Text;
 using Gateway.Domain;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 
 namespace Gateway.Infrastructure;
 

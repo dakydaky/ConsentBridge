@@ -6,31 +6,23 @@ using Gateway.Domain;
 using Gateway.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.OpenApi;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Primitives;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Serilog;
-using System.Linq;
-using System.Net.Http.Json;
 using System.Text;
 using Microsoft.AspNetCore.DataProtection;
-using System.IO;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http.HttpResults;
-using System.Threading;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Serilog setup
 builder.Host.UseSerilog((ctx, lc) => lc
     .ReadFrom.Configuration(ctx.Configuration)
     .Enrich.FromLogContext()
     .WriteTo.Console());
 
-// DbContext + infrastructure services
 builder.Services.AddDbContext<GatewayDbContext>(opts =>
     opts.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 builder.Services.Configure<JwtAccessTokenOptions>(builder.Configuration.GetSection("Auth:Jwt"));
@@ -42,9 +34,7 @@ var payloadSerializerOptions = new JsonSerializerOptions(JsonSerializerDefaults.
 {
     WriteIndented = false
 };
-// JWS header serializer options moved into Gateway.Api.Helpers.JwsHelpers
 
-// Http client for the MockBoard adapter
 builder.Services.AddHttpClient("mockboard", client =>
 {
     var baseUrl = Environment.GetEnvironmentVariable("MOCKBOARD_URL") ?? "http://mockboard:8081";
@@ -113,7 +103,6 @@ builder.Services.AddDataProtection()
 builder.Services.AddRazorPages();
 var app = builder.Build();
 
-// Apply migrations automatically for the demo scenario
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<GatewayDbContext>();
@@ -265,9 +254,7 @@ app.MapPost("/v1/dsr/delete", async (
       return op;
   });
 
-// Create Consent (simplified for demo usage)
 
-// Create consent request (agent-triggered)
 app.MapPost("/v1/consent-requests", async (
     ClaimsPrincipal user,
     [FromBody] CreateConsentRequestDto dto,
@@ -369,7 +356,6 @@ app.MapGet("/v1/consents/{id:guid}", async (
     return Results.Ok(ApiHelpers.MapConsent(consent));
 }).RequireAuthorization("apply.submit");
 
-// Submit Application (consent + JWS validation are stubbed for demo)
 app.MapPost("/v1/applications", async (
     [FromHeader(Name = "X-JWS-Signature")] string? jws,
     [FromBody] ApplyPayloadDto payload,
@@ -751,9 +737,6 @@ string ComputeConsentTokenHash(string token)
     return Convert.ToHexString(hash);
 }
 
-// JWS parsing moved into Gateway.Api.Helpers.JwsHelpers
 
-// mapping helpers moved into Gateway.Api.Helpers.ApiHelpers
-
-// JWS header record moved into Gateway.Api.Helpers.JwsHelpers
+ 
 

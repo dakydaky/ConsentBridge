@@ -1,7 +1,4 @@
-using System;
-using System.Threading.Tasks;
 using FluentAssertions;
-using System.Linq;
 using Gateway.Domain;
 using Gateway.Infrastructure;
 using Microsoft.EntityFrameworkCore;

@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-
 namespace Gateway.Domain;
 
 public class Candidate

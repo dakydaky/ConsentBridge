@@ -1,5 +1,4 @@
 using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using System.Text;
 using FluentAssertions;
 using Gateway.Domain;
@@ -255,7 +254,7 @@ public class JwtConsentTokenFactoryTests
 
     private sealed class TestLogger<T> : Microsoft.Extensions.Logging.ILogger<T>
     {
-        public IDisposable BeginScope<TState>(TState state) => NullScope.Instance;
+        public IDisposable BeginScope<TState>(TState state) where TState : notnull => NullScope.Instance;
         public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => false;
         public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) { }
 
