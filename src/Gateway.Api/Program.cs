@@ -46,7 +46,7 @@ if (app.Environment.IsDevelopment())
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
 // Create Consent (simplified for demo usage)
-app.MapPost("/v1/consents", async ([FromBody] CreateConsentDto dto, GatewayDbContext db) =>
+app.MapPost("/v1/consents", async ([FromBody] CreateConsentDto dto, GatewayDbContext db, IConsentTokenFactory tokenFactory) =>
 {
     var normalizedEmail = dto.CandidateEmail.ToLowerInvariant();
     var candidate = await db.Candidates.FirstOrDefaultAsync(c => c.EmailHash == normalizedEmail);
@@ -69,14 +69,19 @@ app.MapPost("/v1/consents", async ([FromBody] CreateConsentDto dto, GatewayDbCon
         BoardTenantId = dto.BoardTenantId,
         Status = ConsentStatus.Active,
         IssuedAt = DateTime.UtcNow,
-        ExpiresAt = DateTime.UtcNow.AddMonths(6),
-        Scopes = "apply:submit"
+        Scopes = "apply:submit",
+        ApprovedByEmail = normalizedEmail
     };
+
+    var issue = tokenFactory.IssueToken(consent, candidate);
+    consent.TokenId = issue.TokenId;
+    consent.TokenExpiresAt = issue.ExpiresAt;
+    consent.ExpiresAt = issue.ExpiresAt;
+
     db.Consents.Add(consent);
     await db.SaveChangesAsync();
 
-    var token = $"ctok:{consent.Id}";
-    return Results.Ok(new { consent_token = token, consent_id = consent.Id });
+    return Results.Ok(new { consent_token = issue.Token, consent_id = consent.Id });
 });
 
 // Submit Application (consent + JWS validation are stubbed for demo)
@@ -97,14 +102,14 @@ app.MapPost("/v1/applications", async (
         return Results.Unauthorized();
     }
 
-    if (!Guid.TryParse(payload.ConsentToken.Split(':')[1], out var consentId))
+    if (!Guid.TryParse(payload.ConsentToken.Split(':')[1], out var tokenId))
     {
         return Results.Unauthorized();
     }
 
     var consent = await db.Consents.Include(c => c.Candidate)
-        .FirstOrDefaultAsync(c => c.Id == consentId);
-    if (consent is null || consent.Status != ConsentStatus.Active || consent.ExpiresAt <= DateTime.UtcNow)
+        .FirstOrDefaultAsync(c => c.TokenId == tokenId);
+    if (consent is null || consent.Status != ConsentStatus.Active || consent.ExpiresAt <= DateTime.UtcNow || consent.TokenExpiresAt <= DateTime.UtcNow)
     {
         return Results.Forbid();
     }
@@ -164,5 +169,21 @@ app.MapPost("/v1/consents/{id:guid}/revoke", async (Guid id, GatewayDbContext db
     await db.SaveChangesAsync();
     return Results.NoContent();
 });
+
+app.MapPost("/oauth/token", () => Results.StatusCode(StatusCodes.Status501NotImplemented))
+   .WithTags("Auth")
+   .WithOpenApi(op =>
+   {
+       op.Summary = "Client credentials token issuance (coming soon)";
+       return op;
+   });
+
+app.MapGet("/internal/tenants", () => Results.StatusCode(StatusCodes.Status501NotImplemented))
+   .WithTags("Internal")
+   .WithOpenApi(op =>
+   {
+       op.Summary = "Tenant listing (admin) – placeholder";
+       return op;
+   });
 
 app.Run();

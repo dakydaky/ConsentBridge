@@ -1,6 +1,11 @@
 Near-Term Productization
 
-Consent UX & Auth – Build the consent web flow promised in docs: tenant onboarding, branded consent screens, per-tenant OAuth client credentials, and enforcing scoped tokens in the API rather than the current accept-all stub (docs/spec/consent-apply-v0.1.md, README.md “Next steps”).
+Consent UX & Auth
+- ✅ ADR 0001 recorded; see docs/adr/0001-consent-ux-auth.md and foundational design in docs/design/consent-ux-auth-foundation.md.
+- [WIP] Implement tenant & credential persistence (schema in place; add provisioning flows + seeding).
+- Build `/oauth/token` client credentials endpoint (secret hashing, JWT emission, scope enforcement).
+- Deliver consent web flow (email verification, consent approval UI, token issuance via Gateway.CertAuthority).
+- Replace `ctok:` demo token with signed JWT + detached-JWS validation per tenant.
 Real Signature Handling – Replace AcceptAllVerifier with ES256/EdDSA detached-JWS validation, plug in tenant JWKS discovery, and persist JWS metadata for audits (docs/spec/whitepaper.md and spec-multi.md call out cryptographic guarantees).
 Receipts & Provenance – MockBoard currently returns unsigned JSON. Implement the signed-receipt contract, verify receipts server-side, and generate the recruiter-facing provenance card described in the spec pack.
 Data & Compliance
