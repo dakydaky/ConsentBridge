@@ -1,5 +1,5 @@
 {
-  "consentToken": "ctok:4b3b03a3-e263-4cc2-b8a8-baeb07a90326",
+  "consentToken": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjYW5kXzEyMyIsImF1ZCI6ImFnZW50X21vY2siLCJpc3MiOiJodHRwczovL2dhdGV3YXkuZXUiLCJzY29wZSI6WyJhcHBseTpzdWJtaXQiXSwiYm9hcmRzIjpbIm1vY2tib2FyZF9ldSJdLCJleHAiOjE3MzU2ODk2MDAsImp0aSI6ImNvbnNlbnRfanRpX0RFTTcifQ.3qEuKpUGU2z7KfJQp-2nI7JxQdNxg9w6nPzFZP0PlCI",
   "candidate": {
     "id": "cand_123",
     "contact": {

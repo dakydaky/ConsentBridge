@@ -14,7 +14,7 @@ consent-apply-gateway/
 │  ├─ Gateway.Api/                 # ASP.NET Core Minimal APIs + OpenAPI
 │  ├─ Gateway.Domain/             # Entities, Value Objects, Policies
 │  ├─ Gateway.Application/        # Use-cases, Handlers, Services interfaces
-│  ├─ Gateway.Infrastructure/     # EF Core, Postgres, Key Vault, Email
+│  ├─ Gateway.Infrastructure/     # EF Core, Postgres, Secrets, Email
 │  ├─ Gateway.CertAuthority/      # JWK/JWT issuing, key rotation jobs
 │  ├─ Gateway.Sdk.DotNet/         # Partner SDK (client + models + signing)
 │  └─ Gateway.Test/               # Unit/integration tests
@@ -38,9 +38,10 @@ Tables (Postgres):
 * `tenants(id, name, type=board|ats|agent, jwks_uri, status)`
 * `candidates(id, email_hash, pii_enc_blob, created_at)`
 * `consents(id, candidate_id, agent_tenant_id, board_tenant_id, scopes[], status, issued_at, expires_at, revoked_at)`
-* `keys(id, tenant_id, kid, alg, public_jwk, created_at, rotated_at)`
+* `tenant_keys(id, tenant_id, kid, alg, public_jwk, created_at, rotated_at, status)`
 * `applications(id, consent_id, agent_tenant_id, board_tenant_id, status, submitted_at, receipt, payload_hash)`
-* `audits(id, actor, action, tenant_id, subject_id, metadata_jsonb, at)`
+* `audit_events(id, tenant_id, category, action, entity_type, entity_id, payload_hash, actor_type, actor_id, jti, metadata_jsonb, created_at)`
+* `audit_event_hashes(event_id, tenant_chain_id, previous_hash, current_hash, created_at)`
 
 ---
 
@@ -72,7 +73,7 @@ Consent Token (JWT claims):
   "scope": ["apply:submit"],
   "boards": ["board_stepstone"],
   "exp": 1735689600,
-  "jti": "ctok_9J..."
+  "jti": "consent_jti_9J..."
 }
 ```
 

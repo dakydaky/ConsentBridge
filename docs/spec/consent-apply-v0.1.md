@@ -27,7 +27,7 @@
   "scope": ["apply:submit"],
   "boards": ["board_stepstone"],
   "exp": 1735689600,
-  "jti": "ctok_9Jq..."
+  "jti": "consent_jti_9Jq..."
 }
 ````
 
@@ -53,7 +53,7 @@ Canonical JSON document containing candidate info, job reference, materials, and
 ```json
 {
   "spec": "consent-apply/v0.1",
-  "consent_token": "<JWT or ctok:UUID in demo>",
+  "consent_token": "<Consent JWT (demo mode also accepts ctok:UUID during transition)>",
   "candidate": {
     "id": "cand_123",
     "contact": {"email": "alice@example.com", "phone": "+45 1234"},
@@ -118,7 +118,7 @@ Canonical JSON document containing candidate info, job reference, materials, and
 
 ## 10. Compatibility
 
-* **Demo mode:** Accepts `ctok:UUID` tokens and skips real JWS verification for local testing.
+* **Demo mode:** Accepts `ctok:UUID` tokens and skips real JWS verification for local testing during the migration to ADR 0002.
 * **Prod mode:** Requires valid consent JWT, detached JWS, optional PII envelope decryption.
 
 ## 11. Versioning

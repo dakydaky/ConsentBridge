@@ -261,10 +261,11 @@ components:
     ApplyPayload:
       type: object
       required: [ConsentToken, Candidate, Job, Materials, Meta]
-      properties:
-        ConsentToken:
-          type: string
-          description: Consent token JWT (demo uses ctok:UUID)
+        properties:
+          ConsentToken:
+            type: string
+            description: Consent token JWT (demo compatibility accepts ctok:UUID)
+            example: eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjYW5kXzEyMyIsImF1ZCI6ImFnZW50X21vY2siLCJpc3MiOiJodHRwczovL2dhdGV3YXkuZXUiLCJzY29wZSI6WyJhcHBseTpzdWJtaXQiXSwiYm9hcmRzIjpbIm1vY2tib2FyZF9ldSJdLCJleHAiOjE3MzU2ODk2MDAsImp0aSI6ImNvbnNlbnRfanRpX0RFTTcifQ.3qEuKpUGU2z7KfJQp-2nI7JxQdNxg9w6nPzFZP0PlCI
         Candidate:
           $ref: '#/components/schemas/Candidate'
         Job:

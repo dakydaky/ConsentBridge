@@ -36,7 +36,7 @@ This note captures the concrete data model and service changes required before b
 - Keep existing `Scopes`, `IssuedAt`, `RevokedAt`.
 
 ### Audit Trail (Phase Two)
-- Introduce `ConsentAudit` table to capture transitions (Created, Approved, Revoked) once API endpoints are wired. Not part of this initial schema pass but noted for later work.
+- Emit append-only records into the shared `audit_events`/`audit_event_hashes` tables (see ADR 0003) for consent lifecycle transitions (Requested, Verified, Approved, Revoked). Not part of this initial schema pass but noted for later work.
 
 ## 2. Domain Layer Changes
 1. Extend `Gateway.Domain` with new entities:
