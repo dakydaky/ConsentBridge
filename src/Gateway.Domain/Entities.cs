@@ -85,3 +85,30 @@ public class TenantCredential
     public DateTime CreatedAt { get; set; }
     public DateTime? LastRotatedAt { get; set; }
 }
+
+public class ConsentRequest
+{
+    public Guid Id { get; set; }
+    public string AgentTenantId { get; set; } = default!;
+    public string BoardTenantId { get; set; } = default!;
+    public string CandidateEmail { get; set; } = default!;
+    public string Scopes { get; set; } = "apply:submit";
+    public ConsentRequestStatus Status { get; set; }
+    public string? VerificationCodeHash { get; set; }
+    public int VerificationAttempts { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime ExpiresAt { get; set; }
+    public DateTime? VerifiedAt { get; set; }
+    public DateTime? DecisionAt { get; set; }
+    public Guid? ConsentId { get; set; }
+    public Consent? Consent { get; set; }
+}
+
+public enum ConsentRequestStatus
+{
+    Pending = 1,
+    Verified = 2,
+    Approved = 3,
+    Denied = 4,
+    Expired = 5
+}

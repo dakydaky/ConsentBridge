@@ -76,22 +76,38 @@ docker compose up --build
 # Mock Board   → http://localhost:8081/health
 ```
 
-### 3) Create a consent
+### 3) Get an access token
 ```bash
-curl -s -X POST http://localhost:8080/v1/consents \
-  -H "Content-Type: application/json" \
+ACCESS_TOKEN=$(curl -s -X POST http://localhost:8080/oauth/token \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "grantType": "client_credentials",
+    "clientId": "agent_acme_client",
+    "clientSecret": "agent-secret",
+    "scope": "apply.submit"
+  }' | jq -r '.access_token')
+echo "ACCESS_TOKEN=$ACCESS_TOKEN"
+```
+
+### 4) Initiate a consent request
+```bash
+REQUEST_ID=$(curl -s -X POST http://localhost:8080/v1/consent-requests \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H 'Content-Type: application/json' \
   -d '{
     "CandidateEmail":"alice@example.com",
     "AgentTenantId":"agent_acme",
-    "BoardTenantId":"mockboard_eu"
-  }'
+    "BoardTenantId":"mockboard_eu",
+    "Scopes":["apply.submit"]
+  }' | jq -r '.request_id')
+echo "Consent request ID: $REQUEST_ID"
 ```
-→ Copy `consent_token` from the response.
 
-### 4) Submit a (signed) application
+Check the API logs for the one-time code (OTP) that is logged for demo purposes, then open `http://localhost:8080/consent/$REQUEST_ID`, enter the OTP, and approve the request. Copy the consent token shown on the success screen (`TOKEN`).
+
+### 5) Submit a (signed) application
 ```bash
-ACCESS_TOKEN=REPLACE_WITH_TOKEN
-TOKEN=ctok:REPLACE
+TOKEN=ctok:REPLACE_WITH_TOKEN_FROM_WEB
 curl -s -X POST http://localhost:8080/v1/applications \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H 'Content-Type: application/json' \
@@ -118,9 +134,10 @@ curl -s -X POST http://localhost:8080/v1/applications \
   }'
 ```
 
-### 5) Revoke consent
+### 6) Revoke consent
 ```bash
-curl -X POST http://localhost:8080/v1/consents/{consent_id}/revoke -i
+curl -X POST http://localhost:8080/v1/consents/{consent_id}/revoke \
+  -H "Authorization: Bearer $ACCESS_TOKEN" -i
 ```
 
 ---
@@ -135,7 +152,7 @@ curl -X POST http://localhost:8080/v1/consents/{consent_id}/revoke -i
 ---
 
 ## 🔌 API Surface (minimal)
-- `POST /v1/consents` → create consent intent (returns `consent_token`)
+- `POST /v1/consent-requests` -> initiate consent flow (OTP + web approval)
 - `POST /v1/applications` → submit **detached‑JWS** signed ApplyPayload
 - `GET /v1/applications/{id}` → retrieve application status
 - `POST /v1/consents/{id}/revoke` → revoke consent
@@ -207,6 +224,9 @@ PRs welcome! Please:
 
 ## 🙌 Credits
 Built with ❤️ for EU job seekers, boards, and ATS vendors who want **trust without friction**.
+
+
+
 
 
 

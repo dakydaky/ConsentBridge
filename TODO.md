@@ -5,7 +5,7 @@ Consent UX & Auth
 - ✅ Implement tenant & credential persistence (schema + demo seeding in place).
 - ✅ `/oauth/token` client credentials endpoint with hashed secret validation + JWT issuance.
 - ✅ Enforce bearer tokens on `/v1/applications` (JWT auth + scope policy).
-- Deliver consent web flow (email verification, consent approval UI, token issuance via Gateway.CertAuthority).
+- ✅ Deliver consent web flow MVP (OTP verification, Razor pages, consent issuance).
 - Replace `ctok:` demo token with signed JWT + detached-JWS validation per tenant.
 Real Signature Handling – Replace AcceptAllVerifier with ES256/EdDSA detached-JWS validation, plug in tenant JWKS discovery, and persist JWS metadata for audits (docs/spec/whitepaper.md and spec-multi.md call out cryptographic guarantees).
 Receipts & Provenance – MockBoard currently returns unsigned JSON. Implement the signed-receipt contract, verify receipts server-side, and generate the recruiter-facing provenance card described in the spec pack.
@@ -24,4 +24,5 @@ Ecosystem & Delivery
 SDK & Client Tooling – Flesh out Gateway.Sdk.DotNet with actual HTTP client, signing helpers, and samples; publish to help partners integrate.
 Deployment Assets – Replace placeholder .gitkeep charts/manifests with real Helm/K8s manifests, CI pipeline definitions, and update README setup steps accordingly.
 Documentation & Storytelling – Expand README with architecture diagrams, API walkthroughs, and troubleshooting; align Swagger metadata with the published OpenAPI in docs/api/openapi.yaml.
+
 

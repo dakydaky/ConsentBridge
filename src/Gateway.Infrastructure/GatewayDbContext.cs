@@ -14,6 +14,7 @@ public class GatewayDbContext : DbContext
     public DbSet<Application> Applications => Set<Application>();
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<TenantCredential> TenantCredentials => Set<TenantCredential>();
+    public DbSet<ConsentRequest> ConsentRequests => Set<ConsentRequest>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -28,6 +29,14 @@ public class GatewayDbContext : DbContext
             .HasOne(tc => tc.Tenant)
             .WithMany(t => t.Credentials)
             .HasForeignKey(tc => tc.TenantId);
+        b.Entity<ConsentRequest>()
+            .HasIndex(cr => cr.AgentTenantId);
+        b.Entity<ConsentRequest>()
+            .HasIndex(cr => new { cr.CandidateEmail, cr.Status });
+        b.Entity<ConsentRequest>()
+            .HasOne(cr => cr.Consent)
+            .WithMany()
+            .HasForeignKey(cr => cr.ConsentId);
         base.OnModelCreating(b);
     }
 }

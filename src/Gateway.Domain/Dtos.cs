@@ -1,6 +1,8 @@
 namespace Gateway.Domain;
 
-public record CreateConsentDto(string CandidateEmail, string AgentTenantId, string BoardTenantId);
+public record CreateConsentRequestDto(string CandidateEmail, string AgentTenantId, string BoardTenantId, IReadOnlyList<string> Scopes);
+public record VerifyConsentRequestDto(string Code);
+public record ConsentDecisionDto(bool Approve);
 
 public record ApplyPayloadDto(
     string ConsentToken,

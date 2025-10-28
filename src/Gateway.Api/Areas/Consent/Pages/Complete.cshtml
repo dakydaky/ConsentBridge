@@ -1,0 +1,25 @@
+@page "/consent/{id:guid}/complete"
+@model Gateway.Api.Areas.Consent.Pages.CompleteModel
+@{
+    ViewData["Title"] = "Consent status";
+}
+
+<div class="badge">
+    ConsentBridge Summary
+</div>
+
+<h1>@Model.Heading</h1>
+<p>@Model.Description</p>
+
+@if (!string.IsNullOrEmpty(Model.ConsentToken))
+{
+    <div class="message">
+        Save this token; you will need to share it with your agent.
+        <code class="token">@Model.ConsentToken</code>
+    </div>
+}
+
+<div class="btn-row">
+    <a class="btn secondary" href="https://consentbridge.io" target="_blank">Learn more</a>
+</div>
+

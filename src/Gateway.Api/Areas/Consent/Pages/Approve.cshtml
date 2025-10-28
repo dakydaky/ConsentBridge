@@ -1,0 +1,57 @@
+@page "/consent/{id:guid}/approve"
+@model Gateway.Api.Areas.Consent.Pages.ApproveModel
+@{
+    ViewData["Title"] = "Review and approve";
+}
+
+<div class="badge">
+    Review requested scopes
+</div>
+
+<h1>Allow agent access?</h1>
+<p>
+    <strong>@Model.RequestEntity?.AgentTenantId</strong> wants to apply on your behalf to
+    <strong>@Model.RequestEntity?.BoardTenantId</strong>.
+</p>
+
+@if (!string.IsNullOrEmpty(Model.InfoMessage))
+{
+    <div class="message">@Model.InfoMessage</div>
+}
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="message error">@Model.ErrorMessage</div>
+}
+
+@if (Model.RequestEntity is null)
+{
+    <p>This consent request was not found.</p>
+}
+else if (Model.RequestEntity.Status != Gateway.Domain.ConsentRequestStatus.Verified)
+{
+    <p>This consent request is not ready for approval. It may have expired or already been processed.</p>
+    <div class="btn-row">
+        <a class="btn secondary" href="/consent/@Model.RequestEntity.Id">Go back</a>
+    </div>
+}
+else
+{
+    <h2>Scopes included</h2>
+    <ul class="scope-list">
+        @foreach (var scope in Model.ScopeList)
+        {
+            <li>@scope</li>
+        }
+    </ul>
+
+    <p>By approving you authorize the agent to submit your application payload under these scopes. You can revoke this consent at any time.</p>
+
+    <form method="post">
+        <div class="btn-row">
+            <button name="approve" value="true" class="primary" type="submit">Approve consent</button>
+            <button name="approve" value="false" class="secondary" type="submit">Deny</button>
+        </div>
+    </form>
+}
+

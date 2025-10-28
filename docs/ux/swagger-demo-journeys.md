@@ -8,22 +8,28 @@ This note documents the current end-to-end flows we can showcase via Swagger (`h
 
 **Goal**: Show that the gateway can accept an application on behalf of a candidate and persist the outcome while forwarding to the MockBoard adapter.
 
-1. **Create a consent**
-   - Endpoint: `POST /v1/consents`
+1. **Create a consent request**
+   - Endpoint: `POST /v1/consent-requests`
+   - Headers: `Authorization: Bearer <token>` (obtain via Journey C)
    - Body example:
      ```json
      {
        "CandidateEmail": "alice@example.com",
        "AgentTenantId": "agent_acme",
-       "BoardTenantId": "mockboard_eu"
+       "BoardTenantId": "mockboard_eu",
+       "Scopes": ["apply.submit"]
      }
      ```
-   - Expected response: `200 OK` with `consent_token` (`ctok:...`) and `consent_id`.
-   - Notes: Token currently demo-signed; once Consent UX is implemented, this will be issued via the web flow.
+   - Expected response: `202 Accepted` with `request_id` and a link to `/consent/{id}`.
+   - Demo note: The OTP code is written to the API logs so you can complete the flow locally.
 
-2. **Submit an application**
-  - Endpoint: `POST /v1/applications`
-  - Headers: `Authorization: Bearer <token>` (use the Swagger *Authorize* button) and `X-JWS-Signature: demo.signature`
+2. **Complete the web approval**
+   - Visit `http://localhost:8080/consent/{request_id}`.
+   - Enter the OTP, verify your email, and approve the consent. The success page displays the `consent_token`.
+
+3. **Submit an application**
+   - Endpoint: `POST /v1/applications`
+   - Headers: `Authorization: Bearer <token>` and `X-JWS-Signature: demo.signature`
    - Body example (swap in real `ConsentToken`):
      ```json
      {
@@ -50,7 +56,7 @@ This note documents the current end-to-end flows we can showcase via Swagger (`h
    - Expected response: `202 Accepted` with application `id` and `status: Accepted`.
    - Behind the scenes: record is persisted with receipt payload from MockBoard; signature verification is currently stubbed (AcceptAllVerifier).
 
-3. **Retrieve application status**
+4. **Retrieve application status**
    - Endpoint: `GET /v1/applications/{id}`
    - Expected response: `200 OK` with receipt and audit fields showing the forwarded application.
 
@@ -60,7 +66,7 @@ This note documents the current end-to-end flows we can showcase via Swagger (`h
 
 **Goal**: Demonstrate consent issuance, retrieval, and revocation via API, highlighting future auth hooks.
 
-1. **Create consent** – same as step A1.
+1. **Initiate consent** - same as step A1.
 2. **Inspect consent** *(future)*:
    - Planned endpoint: `GET /v1/consents/{id}` (not yet implemented).
    - Will require tenant-auth (bearer token from `/oauth/token`).
@@ -82,6 +88,14 @@ This note documents the current end-to-end flows we can showcase via Swagger (`h
     client_id=agent_acme_client&
     client_secret=agent-secret&
     scope=apply.submit
+    ```
+    ```
+    {
+      "grantType": "client_credentials",
+      "clientId": "agent_acme_client",
+      "clientSecret": "agent-secret",
+      "scope": "apply.submit"
+    }
     ```
   - Expected response: `200 OK`
     ```json
@@ -114,6 +128,7 @@ Track progress in:
 - `TODO.md` (Consent UX & Auth section)
 
 Update this file after each milestone to keep product demos and investor walkthroughs consistent.
+
 
 
 

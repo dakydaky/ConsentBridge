@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using System.Security.Cryptography;
 using Gateway.Api;
 using Gateway.Domain;
 using Gateway.Infrastructure;
@@ -11,7 +13,6 @@ using Microsoft.OpenApi.Models;
 using Serilog;
 using System.Linq;
 using System.Net.Http.Json;
-using System.Security.Claims;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -85,6 +86,7 @@ builder.Services.AddAuthorization(options =>
         policy.RequireAssertion(ctx => HasScope(ctx.User, "apply.submit")));
 });
 
+builder.Services.AddRazorPages();
 var app = builder.Build();
 
 // Apply migrations automatically for the demo scenario
@@ -101,6 +103,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -108,43 +111,64 @@ app.UseAuthorization();
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
 // Create Consent (simplified for demo usage)
-app.MapPost("/v1/consents", async ([FromBody] CreateConsentDto dto, GatewayDbContext db, IConsentTokenFactory tokenFactory) =>
+
+// Create consent request (agent-triggered)
+app.MapPost("/v1/consent-requests", async (
+    ClaimsPrincipal user,
+    [FromBody] CreateConsentRequestDto dto,
+    GatewayDbContext db,
+    IClientSecretHasher hasher,
+    ILogger<Program> logger) =>
 {
-    var normalizedEmail = dto.CandidateEmail.ToLowerInvariant();
-    var candidate = await db.Candidates.FirstOrDefaultAsync(c => c.EmailHash == normalizedEmail);
-    if (candidate == null)
+    var tenantSlug = user.FindFirstValue("sub") ?? string.Empty;
+    var tenantType = user.FindFirstValue("tenant_type");
+    if (string.IsNullOrEmpty(tenantSlug) || !string.Equals(tenantType, nameof(TenantType.Agent), StringComparison.Ordinal))
     {
-        candidate = new Candidate
-        {
-            Id = Guid.NewGuid(),
-            EmailHash = normalizedEmail,
-            CreatedAt = DateTime.UtcNow
-        };
-        db.Candidates.Add(candidate);
+        return Results.Forbid();
     }
 
-    var consent = new Consent
+    if (!string.IsNullOrWhiteSpace(dto.AgentTenantId) && !string.Equals(dto.AgentTenantId, tenantSlug, StringComparison.Ordinal))
+    {
+        return Results.BadRequest(new { error = "agent_mismatch" });
+    }
+
+    var normalizedEmail = dto.CandidateEmail.Trim().ToLowerInvariant();
+    if (string.IsNullOrWhiteSpace(normalizedEmail))
+    {
+        return Results.BadRequest(new { error = "invalid_candidate_email" });
+    }
+    var scopes = dto.Scopes is { Count: > 0 }
+        ? string.Join(' ', dto.Scopes)
+        : "apply:submit";
+
+    var now = DateTime.UtcNow;
+    var request = new ConsentRequest
     {
         Id = Guid.NewGuid(),
-        CandidateId = candidate.Id,
-        AgentTenantId = dto.AgentTenantId,
+        AgentTenantId = tenantSlug,
         BoardTenantId = dto.BoardTenantId,
-        Status = ConsentStatus.Active,
-        IssuedAt = DateTime.UtcNow,
-        Scopes = "apply:submit",
-        ApprovedByEmail = normalizedEmail
+        CandidateEmail = normalizedEmail,
+        Scopes = scopes,
+        Status = ConsentRequestStatus.Pending,
+        CreatedAt = now,
+        ExpiresAt = now.AddHours(24)
     };
 
-    var issue = tokenFactory.IssueToken(consent, candidate);
-    consent.TokenId = issue.TokenId;
-    consent.TokenExpiresAt = issue.ExpiresAt;
-    consent.ExpiresAt = issue.ExpiresAt;
+    var code = GenerateVerificationCode();
+    request.VerificationCodeHash = hasher.HashSecret(code);
 
-    db.Consents.Add(consent);
+    db.ConsentRequests.Add(request);
     await db.SaveChangesAsync();
 
-    return Results.Ok(new { consent_token = issue.Token, consent_id = consent.Id });
-});
+    logger.LogInformation("Consent request {RequestId} for {Email}: verification code {Code}", request.Id, normalizedEmail, code);
+
+    return Results.Accepted($"/consent/{request.Id}", new
+    {
+        request_id = request.Id,
+        expires_at = request.ExpiresAt,
+        link = $"/consent/{request.Id}"
+    });
+}).RequireAuthorization("apply.submit");
 
 // Submit Application (consent + JWS validation are stubbed for demo)
 app.MapPost("/v1/applications", async (
@@ -329,7 +353,14 @@ app.MapGet("/internal/tenants", () => Results.StatusCode(StatusCodes.Status501No
        return op;
    });
 
+app.MapRazorPages();
 app.Run();
+
+static string GenerateVerificationCode()
+{
+    var value = RandomNumberGenerator.GetInt32(0, 1_000_000);
+    return value.ToString("D6");
+}
 
 static bool HasScope(ClaimsPrincipal user, string scope)
 {

@@ -1,0 +1,50 @@
+@page "/consent/{id:guid}"
+@model Gateway.Api.Areas.Consent.Pages.RequestModel
+@{
+    ViewData["Title"] = "Verify your email";
+}
+
+<div class="badge">
+    ConsentBridge • Agent Authorization
+</div>
+
+<h1>Verify your email to continue</h1>
+<p>
+    <strong>@Model.RequestEntity?.AgentTenantId</strong> is requesting consent to apply to
+    <strong>@Model.RequestEntity?.BoardTenantId</strong> on your behalf.
+</p>
+
+@if (!string.IsNullOrEmpty(Model.InfoMessage))
+{
+    <div class="message">@Model.InfoMessage</div>
+}
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="message error">@Model.ErrorMessage</div>
+}
+
+@if (Model.RequestEntity is not null && Model.ShowVerificationForm)
+{
+    <form method="post">
+        <div class="form-field">
+            <label for="code">Enter the 6-digit code we sent</label>
+            <input id="code" name="Input.Code" type="text" maxlength="6" autocomplete="one-time-code" required />
+        </div>
+        <div class="btn-row">
+            <button type="submit" class="primary">Verify code</button>
+        </div>
+    </form>
+
+    <h2>Requested scopes</h2>
+    <ul class="scope-list">
+        @foreach (var scope in Model.ScopeList)
+        {
+            <li>@scope</li>
+        }
+    </ul>
+}
+else if (Model.RequestEntity is not null)
+{
+    <p>This consent request is no longer available. If you believe this is a mistake, contact the requesting agent.</p>
+}
