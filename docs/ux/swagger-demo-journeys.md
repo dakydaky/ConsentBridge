@@ -89,13 +89,7 @@ This note documents the current end-to-end flows we can showcase via Swagger (`h
     client_secret=agent-secret&
     scope=apply.submit
     ```
-    ```
-    {
-      "grantType": "client_credentials",
-      "clientId": "agent_acme_client",
-      "clientSecret": "agent-secret",
-      "scope": "apply.submit"
-    }
+    
     ```
   - Expected response: `200 OK`
     ```json

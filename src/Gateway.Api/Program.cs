@@ -67,6 +67,7 @@ var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Sign
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        options.MapInboundClaims = false;
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidIssuer = jwtOptions.Issuer,
@@ -364,8 +365,19 @@ static string GenerateVerificationCode()
 
 static bool HasScope(ClaimsPrincipal user, string scope)
 {
-    var scopeClaims = user.FindAll("scope");
-    foreach (var claim in scopeClaims)
+    static IEnumerable<Claim> EnumerateScopeClaims(ClaimsPrincipal principal)
+    {
+        foreach (var claim in principal.FindAll("scope"))
+        {
+            yield return claim;
+        }
+        foreach (var claim in principal.FindAll("http://schemas.microsoft.com/ws/2008/06/identity/claims/scope"))
+        {
+            yield return claim;
+        }
+    }
+
+    foreach (var claim in EnumerateScopeClaims(user))
     {
         var scopes = claim.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (scopes.Any(s => string.Equals(s, scope, StringComparison.Ordinal)))
