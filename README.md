@@ -90,8 +90,10 @@ curl -s -X POST http://localhost:8080/v1/consents \
 
 ### 4) Submit a (signed) application
 ```bash
+ACCESS_TOKEN=REPLACE_WITH_TOKEN
 TOKEN=ctok:REPLACE
 curl -s -X POST http://localhost:8080/v1/applications \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H 'Content-Type: application/json' \
   -H 'X-JWS-Signature: demo.signature' \
   -d '{

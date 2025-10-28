@@ -3,7 +3,8 @@ Near-Term Productization
 Consent UX & Auth
 - ✅ ADR 0001 recorded; see docs/adr/0001-consent-ux-auth.md and foundational design in docs/design/consent-ux-auth-foundation.md.
 - ✅ Implement tenant & credential persistence (schema + demo seeding in place).
-- ✅ `/oauth/token` client credentials endpoint with hashed secret validation + JWT issuance (enforcement next).
+- ✅ `/oauth/token` client credentials endpoint with hashed secret validation + JWT issuance.
+- ✅ Enforce bearer tokens on `/v1/applications` (JWT auth + scope policy).
 - Deliver consent web flow (email verification, consent approval UI, token issuance via Gateway.CertAuthority).
 - Replace `ctok:` demo token with signed JWT + detached-JWS validation per tenant.
 Real Signature Handling – Replace AcceptAllVerifier with ES256/EdDSA detached-JWS validation, plug in tenant JWKS discovery, and persist JWS metadata for audits (docs/spec/whitepaper.md and spec-multi.md call out cryptographic guarantees).

@@ -77,6 +77,10 @@ public sealed class JwtAccessTokenFactory : IAccessTokenFactory
         }
         _handler = new JwtSecurityTokenHandler();
         _signingKey = Encoding.UTF8.GetBytes(_options.SigningKey);
+        if (_signingKey.Length < 32)
+        {
+            throw new InvalidOperationException("Auth:Jwt:SigningKey must be at least 256 bits.");
+        }
     }
 
     public AccessTokenResult IssueToken(Tenant tenant, TenantCredential credential, IReadOnlyList<string> scopes)

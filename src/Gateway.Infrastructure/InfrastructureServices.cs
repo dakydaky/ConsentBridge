@@ -1,31 +1,33 @@
 using System;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Configuration;
+using System.Text;
 using Gateway.Domain;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace Gateway.Infrastructure;
 
 public static class InfrastructureServices
 {
-    public static IServiceCollection AddGatewayInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddGatewayInfrastructure(this IServiceCollection services)
     {
         services.AddSingleton<IJwsVerifier, AcceptAllVerifier>();
         services.AddSingleton<IClientSecretHasher, DefaultClientSecretHasher>();
         services.AddSingleton<IConsentTokenFactory>(new DemoConsentTokenFactory());
 
-        services.AddSingleton<IOptions<JwtAccessTokenOptions>>(_ =>
+        services.AddSingleton<IAccessTokenFactory, JwtAccessTokenFactory>();
+        services.PostConfigure<JwtAccessTokenOptions>(options =>
         {
-            var options = new JwtAccessTokenOptions();
-            configuration.GetSection("Auth:Jwt").Bind(options);
             if (string.IsNullOrWhiteSpace(options.SigningKey))
             {
                 throw new InvalidOperationException("Auth:Jwt:SigningKey must be configured.");
             }
-            return Options.Create(options);
+
+            if (Encoding.UTF8.GetBytes(options.SigningKey).Length < 32)
+            {
+                throw new InvalidOperationException("Auth:Jwt:SigningKey must be at least 256 bits.");
+            }
         });
 
-        services.AddSingleton<IAccessTokenFactory, JwtAccessTokenFactory>();
         return services;
     }
 }

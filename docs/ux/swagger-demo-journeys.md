@@ -22,8 +22,8 @@ This note documents the current end-to-end flows we can showcase via Swagger (`h
    - Notes: Token currently demo-signed; once Consent UX is implemented, this will be issued via the web flow.
 
 2. **Submit an application**
-   - Endpoint: `POST /v1/applications`
-   - Headers: `X-JWS-Signature: demo.signature`
+  - Endpoint: `POST /v1/applications`
+  - Headers: `Authorization: Bearer <token>` (use the Swagger *Authorize* button) and `X-JWS-Signature: demo.signature`
    - Body example (swap in real `ConsentToken`):
      ```json
      {
@@ -94,6 +94,7 @@ This note documents the current end-to-end flows we can showcase via Swagger (`h
     ```
   - Returned JWT includes claims for tenant slug (`sub`), tenant id, tenant type, client id, and scopes.
   - Enforcement on `/v1/applications` is still pending; note this to viewers.
+  - After receiving the token, click Swagger’s **Authorize** button and paste `Bearer <token>` so subsequent calls include the header automatically.
   - **Swagger tip:** send the body as JSON if you cannot set the form URL-encoded content type:
     ```json
     {

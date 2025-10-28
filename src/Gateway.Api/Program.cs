@@ -1,13 +1,18 @@
 using Gateway.Api;
 using Gateway.Domain;
 using Gateway.Infrastructure;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Primitives;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using Serilog;
 using System.Linq;
 using System.Net.Http.Json;
+using System.Security.Claims;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,7 +25,10 @@ builder.Host.UseSerilog((ctx, lc) => lc
 // DbContext + infrastructure services
 builder.Services.AddDbContext<GatewayDbContext>(opts =>
     opts.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
-builder.Services.AddGatewayInfrastructure(builder.Configuration);
+builder.Services.Configure<JwtAccessTokenOptions>(builder.Configuration.GetSection("Auth:Jwt"));
+var jwtOptions = builder.Configuration.GetSection("Auth:Jwt").Get<JwtAccessTokenOptions>()
+    ?? throw new InvalidOperationException("Auth:Jwt configuration missing.");
+builder.Services.AddGatewayInfrastructure();
 
 // Http client for the MockBoard adapter
 builder.Services.AddHttpClient("mockboard", client =>
@@ -30,7 +38,52 @@ builder.Services.AddHttpClient("mockboard", client =>
 });
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo { Title = "ConsentBridge Gateway", Version = "v1" });
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        Description = "Enter the bearer token obtained from /oauth/token (e.g., 'Bearer eyJ...')."
+    });
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
+
+var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SigningKey));
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidIssuer = jwtOptions.Issuer,
+            ValidAudience = jwtOptions.Audience,
+            IssuerSigningKey = signingKey,
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ClockSkew = TimeSpan.FromMinutes(1)
+        };
+    });
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("apply.submit", policy =>
+        policy.RequireAssertion(ctx => HasScope(ctx.User, "apply.submit")));
+});
 
 var app = builder.Build();
 
@@ -47,6 +100,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseAuthentication();
+app.UseAuthorization();
+
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
@@ -153,7 +210,7 @@ app.MapPost("/v1/applications", async (
     appRec.Status = ApplicationStatus.Failed;
     await db.SaveChangesAsync();
     return Results.StatusCode(502);
-});
+}).RequireAuthorization("apply.submit");
 
 app.MapGet("/v1/applications/{id:guid}", async (Guid id, GatewayDbContext db) =>
 {
@@ -273,3 +330,18 @@ app.MapGet("/internal/tenants", () => Results.StatusCode(StatusCodes.Status501No
    });
 
 app.Run();
+
+static bool HasScope(ClaimsPrincipal user, string scope)
+{
+    var scopeClaims = user.FindAll("scope");
+    foreach (var claim in scopeClaims)
+    {
+        var scopes = claim.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (scopes.Any(s => string.Equals(s, scope, StringComparison.Ordinal)))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
