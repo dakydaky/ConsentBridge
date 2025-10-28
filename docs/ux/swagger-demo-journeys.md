@@ -1,0 +1,91 @@
+# Swagger Demo Journeys (v0.1)
+
+This note documents the current end-to-end flows we can showcase via Swagger (`http://localhost:8080/swagger`) using the demo scaffold. Update as new endpoints and auth pieces come online.
+
+---
+
+## Journey A – Agent applies with active consent (current happy path)
+
+**Goal**: Show that the gateway can accept an application on behalf of a candidate and persist the outcome while forwarding to the MockBoard adapter.
+
+1. **Create a consent**
+   - Endpoint: `POST /v1/consents`
+   - Body example:
+     ```json
+     {
+       "CandidateEmail": "alice@example.com",
+       "AgentTenantId": "agent_acme",
+       "BoardTenantId": "mockboard_eu"
+     }
+     ```
+   - Expected response: `200 OK` with `consent_token` (`ctok:...`) and `consent_id`.
+   - Notes: Token currently demo-signed; once Consent UX is implemented, this will be issued via the web flow.
+
+2. **Submit an application**
+   - Endpoint: `POST /v1/applications`
+   - Headers: `X-JWS-Signature: demo.signature`
+   - Body example (swap in real `ConsentToken`):
+     ```json
+     {
+       "ConsentToken": "ctok:REPLACE",
+       "Candidate": {
+         "Id": "cand_123",
+         "Contact": { "Email": "alice@example.com", "Phone": "+45 1234" },
+         "Pii": { "FirstName": "Alice", "LastName": "Larsen" },
+         "Cv": { "Url": "https://example/cv.pdf", "Sha256": "deadbeef" }
+       },
+       "Job": {
+         "ExternalId": "mock:98765",
+         "Title": "Backend Engineer",
+         "Company": "ACME GmbH",
+         "ApplyEndpoint": "quick-apply"
+       },
+       "Materials": {
+         "CoverLetter": { "Text": "Hello MockBoard!" },
+         "Answers": [{ "QuestionId": "q_legal_work", "AnswerText": "Yes" }]
+       },
+       "Meta": { "Locale": "de-DE", "UserAgent": "agent/0.1", "Ts": "2025-10-27T10:15:00Z" }
+     }
+     ```
+   - Expected response: `202 Accepted` with application `id` and `status: Accepted`.
+   - Behind the scenes: record is persisted with receipt payload from MockBoard; signature verification is currently stubbed (AcceptAllVerifier).
+
+3. **Retrieve application status**
+   - Endpoint: `GET /v1/applications/{id}`
+   - Expected response: `200 OK` with receipt and audit fields showing the forwarded application.
+
+---
+
+## Journey B – Consent lifecycle & revocation (current behavior)
+
+**Goal**: Demonstrate consent issuance, retrieval, and revocation via API, highlighting future auth hooks.
+
+1. **Create consent** – same as step A1.
+2. **Inspect consent** *(future)*:
+   - Planned endpoint: `GET /v1/consents/{id}` (not yet implemented).
+   - Will require tenant-auth (bearer token) once `/oauth/token` is live.
+3. **Revoke consent**
+   - Endpoint: `POST /v1/consents/{id}/revoke`
+   - Expected response: `204 No Content`.
+   - After revocation, repeat Journey A step 2 with the same token → expect `403 Forbid`.
+
+---
+
+## Journey C – Forthcoming auth enhancements (placeholders)
+
+These flows are stubs today; include them in demos to set expectations.
+
+- **Tenant tokens (`/oauth/token`)**
+  - Currently returns `501 Not Implemented`.
+  - Once built: agents obtain bearer token via client credentials; required for `/v1/applications`.
+
+- **Consent web flow**
+  - Not yet exposed in Swagger.
+  - Will replace direct `POST /v1/consents` with browser-based approval, then the API will issue the consent token through `IConsentTokenFactory`.
+
+Track progress in:
+- `docs/adr/0001-consent-ux-auth.md`
+- `docs/design/consent-ux-auth-foundation.md`
+- `TODO.md` (Consent UX & Auth section)
+
+Update this file after each milestone to keep product demos and investor walkthroughs consistent.
