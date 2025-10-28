@@ -1,6 +1,7 @@
 using System;
 using System.Text;
 using Gateway.Domain;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -12,17 +13,24 @@ public static class InfrastructureServices
 {
     public static IServiceCollection AddGatewayInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddSingleton<ITenantKeyStore>(sp =>
+        services.AddSingleton<ConfigurationTenantKeyStore>(sp =>
         {
             var config = sp.GetRequiredService<IConfiguration>();
             var env = sp.GetRequiredService<IHostEnvironment>();
             return new ConfigurationTenantKeyStore(config, env);
         });
-        services.AddSingleton<IJwsVerifier, JwksJwsVerifier>();
+        services.AddScoped<ITenantKeyStore>(sp =>
+        {
+            var configStore = sp.GetRequiredService<ConfigurationTenantKeyStore>();
+            var factory = sp.GetRequiredService<IDbContextFactory<GatewayDbContext>>();
+            return new CompositeTenantKeyStore(configStore, factory);
+        });
+        services.AddScoped<IJwsVerifier, JwksJwsVerifier>();
         services.AddSingleton<IClientSecretHasher, DefaultClientSecretHasher>();
-        services.AddSingleton<IConsentTokenFactory>(new DemoConsentTokenFactory());
+        services.AddScoped<IConsentTokenFactory, JwtConsentTokenFactory>();
         services.AddScoped<IDsrService, DsrService>();
         services.Configure<RetentionOptions>(configuration.GetSection("Retention"));
+        services.Configure<ConsentTokenOptions>(configuration.GetSection("ConsentTokens"));
         services.AddScoped<DataRetentionExecutor>();
         services.AddHostedService<RetentionCleanupBackgroundService>();
 
@@ -39,6 +47,8 @@ public static class InfrastructureServices
                 throw new InvalidOperationException("Auth:Jwt:SigningKey must be at least 256 bits.");
             }
         });
+
+        services.AddDbContextFactory<GatewayDbContext>();
 
         return services;
     }

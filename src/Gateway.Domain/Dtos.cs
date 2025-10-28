@@ -34,8 +34,11 @@ public record ConsentViewDto(
     ConsentStatus Status,
     DateTime IssuedAt,
     DateTime ExpiresAt,
+    DateTime TokenIssuedAt,
     DateTime TokenExpiresAt,
     Guid TokenId,
+    string? TokenKeyId,
+    string? TokenAlgorithm,
     DateTime? RevokedAt);
 
 public record ApplicationRecordDto(

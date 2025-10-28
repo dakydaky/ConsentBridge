@@ -24,6 +24,10 @@ public class Consent
     public DateTime? RevokedAt { get; set; }
     public Guid TokenId { get; set; }
     public DateTime TokenExpiresAt { get; set; }
+    public DateTime TokenIssuedAt { get; set; }
+    public string? TokenKeyId { get; set; }
+    public string? TokenAlgorithm { get; set; }
+    public string? TokenHash { get; set; }
     public string? ApprovedByEmail { get; set; }
 }
 
@@ -70,6 +74,7 @@ public class Tenant
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public ICollection<TenantCredential> Credentials { get; set; } = new List<TenantCredential>();
+    public ICollection<TenantKey> Keys { get; set; } = new List<TenantKey>();
 }
 
 public enum TenantType
@@ -89,6 +94,49 @@ public class TenantCredential
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; }
     public DateTime? LastRotatedAt { get; set; }
+}
+
+public class TenantKey
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Tenant? Tenant { get; set; }
+    public string KeyId { get; set; } = default!;
+    public TenantKeyPurpose Purpose { get; set; }
+    public TenantKeyStatus Status { get; set; }
+    public string Algorithm { get; set; } = "ES256";
+    public string PublicJwk { get; set; } = default!;
+    public byte[] PrivateKeyProtected { get; set; } = Array.Empty<byte>();
+    public DateTime CreatedAt { get; set; }
+    public DateTime ActivatedAt { get; set; }
+    public DateTime ExpiresAt { get; set; }
+    public DateTime? RetiredAt { get; set; }
+    public DateTime? LastUsedAt { get; set; }
+}
+
+public enum TenantKeyPurpose
+{
+    ConsentToken = 1
+}
+
+public enum TenantKeyStatus
+{
+    Active = 1,
+    Next = 2,
+    Retired = 3
+}
+
+public class ConsentTokenRecord
+{
+    public Guid Id { get; set; }
+    public Guid ConsentId { get; set; }
+    public Consent? Consent { get; set; }
+    public Guid TokenId { get; set; }
+    public string TokenHash { get; set; } = default!;
+    public string KeyId { get; set; } = default!;
+    public string Algorithm { get; set; } = "ES256";
+    public DateTime IssuedAt { get; set; }
+    public DateTime ExpiresAt { get; set; }
 }
 
 public class ConsentRequest

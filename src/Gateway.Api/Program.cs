@@ -1,3 +1,4 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using Gateway.Api;
@@ -8,6 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Primitives;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Serilog;
@@ -342,6 +344,7 @@ app.MapPost("/v1/applications", async (
     GatewayDbContext db,
     IHttpClientFactory httpFactory,
     IJwsVerifier verifier,
+    IOptions<ConsentTokenOptions> consentTokenOptions,
     ILogger<Program> logger) =>
 {
     if (payload is null)
@@ -354,21 +357,114 @@ app.MapPost("/v1/applications", async (
         return Results.BadRequest(new { error = "missing_signature" });
     }
 
-    if (string.IsNullOrWhiteSpace(payload.ConsentToken) || !payload.ConsentToken.StartsWith("ctok:"))
+    if (string.IsNullOrWhiteSpace(payload.ConsentToken))
     {
         return Results.Unauthorized();
     }
 
-    if (!Guid.TryParse(payload.ConsentToken.Split(':')[1], out var tokenId))
-    {
-        return Results.Unauthorized();
-    }
+    Consent? consent;
+    Guid tokenId;
 
-    var consent = await db.Consents.Include(c => c.Candidate)
-        .FirstOrDefaultAsync(c => c.TokenId == tokenId);
-    if (consent is null || consent.Status != ConsentStatus.Active || consent.ExpiresAt <= DateTime.UtcNow || consent.TokenExpiresAt <= DateTime.UtcNow)
+    if (payload.ConsentToken.StartsWith("ctok:", StringComparison.Ordinal))
     {
-        return Results.Forbid();
+        var parts = payload.ConsentToken.Split(':', 2);
+        if (parts.Length != 2 || !Guid.TryParse(parts[1], out tokenId))
+        {
+            return Results.Unauthorized();
+        }
+
+        consent = await db.Consents.Include(c => c.Candidate)
+            .FirstOrDefaultAsync(c => c.TokenId == tokenId);
+        if (consent is null || consent.Status != ConsentStatus.Active || consent.ExpiresAt <= DateTime.UtcNow || consent.TokenExpiresAt <= DateTime.UtcNow)
+        {
+            return Results.Forbid();
+        }
+    }
+    else
+    {
+        var handler = new JwtSecurityTokenHandler();
+        JwtSecurityToken jwtToken;
+        try
+        {
+            jwtToken = handler.ReadJwtToken(payload.ConsentToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to parse consent token JWT.");
+            return Results.Unauthorized();
+        }
+
+        if (!Guid.TryParse(jwtToken.Id, out tokenId))
+        {
+            return Results.Unauthorized();
+        }
+
+        consent = await db.Consents.Include(c => c.Candidate)
+            .FirstOrDefaultAsync(c => c.TokenId == tokenId);
+        if (consent is null || consent.Status != ConsentStatus.Active || consent.ExpiresAt <= DateTime.UtcNow || consent.TokenExpiresAt <= DateTime.UtcNow)
+        {
+            return Results.Forbid();
+        }
+
+        var agentTenant = await db.Tenants.AsNoTracking()
+            .FirstOrDefaultAsync(t => t.Slug == consent.AgentTenantId);
+        if (agentTenant is null)
+        {
+            return Results.Forbid();
+        }
+
+        var keyRecord = await db.TenantKeys.AsNoTracking()
+            .FirstOrDefaultAsync(k =>
+                k.TenantId == agentTenant.Id &&
+                k.KeyId == jwtToken.Header.Kid &&
+                k.Purpose == TenantKeyPurpose.ConsentToken &&
+                k.Status != TenantKeyStatus.Retired);
+        if (keyRecord is null)
+        {
+            logger.LogWarning("No active consent signing key found for tenant {Tenant} and kid {Kid}.", consent.AgentTenantId, jwtToken.Header.Kid);
+            return Results.Unauthorized();
+        }
+
+        var validationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = consentTokenOptions.Value.Issuer,
+            ValidateAudience = true,
+            ValidAudience = consent.BoardTenantId,
+            ValidateLifetime = true,
+            RequireExpirationTime = true,
+            RequireSignedTokens = true,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new JsonWebKey(keyRecord.PublicJwk),
+            ClockSkew = TimeSpan.FromMinutes(2)
+        };
+
+        ClaimsPrincipal principal;
+        try
+        {
+            principal = handler.ValidateToken(payload.ConsentToken, validationParameters, out _);
+        }
+        catch (SecurityTokenException ex)
+        {
+            logger.LogWarning(ex, "Consent token validation failed for consent {ConsentId}", consent.Id);
+            return Results.Unauthorized();
+        }
+
+        if (!ValidateConsentClaims(principal, consent))
+        {
+            logger.LogWarning("Consent token claims mismatch for consent {ConsentId}", consent.Id);
+            return Results.Forbid();
+        }
+
+        if (consent.TokenHash is not null)
+        {
+            var computed = ComputeConsentTokenHash(payload.ConsentToken);
+            if (!string.Equals(computed, consent.TokenHash, StringComparison.Ordinal))
+            {
+                logger.LogWarning("Consent token hash mismatch for consent {ConsentId}", consent.Id);
+                return Results.Forbid();
+            }
+        }
     }
 
     var payloadBytes = JsonSerializer.SerializeToUtf8Bytes(payload, payloadSerializerOptions);
@@ -626,6 +722,49 @@ bool HasScope(ClaimsPrincipal user, string scope)
     return false;
 }
 
+bool ValidateConsentClaims(ClaimsPrincipal principal, Consent consent)
+{
+    if (principal is null || consent is null)
+    {
+        return false;
+    }
+
+    var jtiClaim = principal.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
+    if (!Guid.TryParse(jtiClaim, out var jti) || jti != consent.TokenId)
+    {
+        return false;
+    }
+
+    if (!string.Equals(principal.FindFirst("cid")?.Value, consent.Id.ToString(), StringComparison.Ordinal))
+    {
+        return false;
+    }
+
+    if (!string.Equals(principal.FindFirst("agent")?.Value, consent.AgentTenantId, StringComparison.Ordinal))
+    {
+        return false;
+    }
+
+    if (!string.Equals(principal.FindFirst("board")?.Value, consent.BoardTenantId, StringComparison.Ordinal))
+    {
+        return false;
+    }
+
+    if (!string.Equals(principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value, consent.CandidateId.ToString(), StringComparison.Ordinal))
+    {
+        return false;
+    }
+
+    return true;
+}
+
+string ComputeConsentTokenHash(string token)
+{
+    var bytes = Encoding.UTF8.GetBytes(token);
+    var hash = SHA256.HashData(bytes);
+    return Convert.ToHexString(hash);
+}
+
 bool TryParseDetachedJws(string jws, ReadOnlySpan<byte> canonicalJson, out JwsHeader header)
 {
     header = default!;
@@ -705,8 +844,11 @@ ConsentViewDto MapConsent(Consent consent) =>
         consent.Status,
         consent.IssuedAt,
         consent.ExpiresAt,
+        consent.TokenIssuedAt,
         consent.TokenExpiresAt,
         consent.TokenId,
+        consent.TokenKeyId,
+        consent.TokenAlgorithm,
         consent.RevokedAt);
 
 IReadOnlyList<string> SplitScopes(string scopes) =>

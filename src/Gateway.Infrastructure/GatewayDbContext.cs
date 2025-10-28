@@ -15,6 +15,8 @@ public class GatewayDbContext : DbContext
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<TenantCredential> TenantCredentials => Set<TenantCredential>();
     public DbSet<ConsentRequest> ConsentRequests => Set<ConsentRequest>();
+    public DbSet<TenantKey> TenantKeys => Set<TenantKey>();
+    public DbSet<ConsentTokenRecord> ConsentTokens => Set<ConsentTokenRecord>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -23,12 +25,49 @@ public class GatewayDbContext : DbContext
         b.Entity<Consent>().HasOne(c => c.Candidate).WithMany().HasForeignKey(c => c.CandidateId);
         b.Entity<Application>().HasOne(a => a.Consent).WithMany().HasForeignKey(a => a.ConsentId);
         b.Entity<Consent>().HasIndex(c => c.TokenId).IsUnique();
+        b.Entity<Consent>().Property(c => c.TokenHash).HasMaxLength(128);
+        b.Entity<Consent>().Property(c => c.TokenKeyId).HasMaxLength(64);
+        b.Entity<Consent>().Property(c => c.TokenAlgorithm).HasMaxLength(32);
         b.Entity<Tenant>().HasIndex(t => t.Slug).IsUnique();
         b.Entity<TenantCredential>().HasIndex(tc => tc.ClientId).IsUnique();
         b.Entity<TenantCredential>()
             .HasOne(tc => tc.Tenant)
             .WithMany(t => t.Credentials)
             .HasForeignKey(tc => tc.TenantId);
+        b.Entity<TenantKey>()
+            .HasIndex(k => new { k.TenantId, k.Purpose, k.KeyId })
+            .IsUnique();
+        b.Entity<TenantKey>()
+            .HasOne(k => k.Tenant)
+            .WithMany(t => t.Keys)
+            .HasForeignKey(k => k.TenantId);
+        b.Entity<TenantKey>()
+            .Property(k => k.KeyId)
+            .HasMaxLength(64);
+        b.Entity<TenantKey>()
+            .Property(k => k.PublicJwk)
+            .HasColumnType("jsonb");
+        b.Entity<TenantKey>()
+            .Property(k => k.PrivateKeyProtected)
+            .HasColumnType("bytea");
+        b.Entity<ConsentTokenRecord>()
+            .HasIndex(ct => ct.TokenId)
+            .IsUnique();
+        b.Entity<ConsentTokenRecord>()
+            .HasIndex(ct => ct.TokenHash);
+        b.Entity<ConsentTokenRecord>()
+            .HasOne(ct => ct.Consent)
+            .WithMany()
+            .HasForeignKey(ct => ct.ConsentId);
+        b.Entity<ConsentTokenRecord>()
+            .Property(ct => ct.TokenHash)
+            .HasMaxLength(128);
+        b.Entity<ConsentTokenRecord>()
+            .Property(ct => ct.KeyId)
+            .HasMaxLength(64);
+        b.Entity<ConsentTokenRecord>()
+            .Property(ct => ct.Algorithm)
+            .HasMaxLength(32);
         b.Entity<ConsentRequest>()
             .HasIndex(cr => cr.AgentTenantId);
         b.Entity<ConsentRequest>()
