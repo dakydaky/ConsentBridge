@@ -9,7 +9,7 @@ _Last refreshed: 2025-10-28_
 - ✅ **Client credentials OAuth flow** — `/oauth/token` issues JWTs with hashed secrets and scope enforcement.
 - ✅ **Protected application APIs** — `/v1/applications` now enforce bearer tokens and scope policies.
 - ✅ **Consent web flow MVP** — OTP verification, Razor pages, and consent issuance path shipped.
-- ⏳ **Signed consent tokens (`ctok:` replacement)** — issue per-tenant JWTs, store detached JWS metadata, and rotate keys.
+- ✅ **Signed consent tokens** — per-tenant ES256 JWTs issued with hashed ledger entries and automatic key rotation.
 - ⏳ **Consent session lifecycle policy** — define token TTL, renewal, and post-expiry handling.
 - ⏳ **Agent & board scope management UX** — surface scopes and authorization messaging inside the consent flow.
 - ⏳ **OTP throttling & lockout rules** — rate-limit verification attempts and capture audit events.

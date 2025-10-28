@@ -24,7 +24,14 @@ public interface IConsentTokenFactory
     ConsentTokenIssueResult IssueToken(Consent consent, Candidate candidate);
 }
 
-public record ConsentTokenIssueResult(string Token, Guid TokenId, DateTime ExpiresAt);
+public record ConsentTokenIssueResult(
+    string Token,
+    Guid TokenId,
+    DateTime IssuedAt,
+    DateTime ExpiresAt,
+    string KeyId,
+    string Algorithm,
+    string TokenHash);
 
 public interface IAccessTokenFactory
 {
@@ -32,6 +39,11 @@ public interface IAccessTokenFactory
 }
 
 public record AccessTokenResult(string Token, DateTime ExpiresAt, IReadOnlyList<string> Scopes);
+
+public interface IConsentKeyRotator
+{
+    Task<TenantKey> RotateAsync(string tenantSlug, CancellationToken cancellationToken = default);
+}
 
 public interface IDsrService
 {

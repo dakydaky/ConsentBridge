@@ -2,7 +2,7 @@
 
 | Field   | Value |
 |---------|-------|
-| Status  | Proposed |
+| Status  | Accepted |
 | Date    | 2025-10-28 |
 | Owners  | Platform Team |
 | Tags    | security, auth, tokens, compliance |

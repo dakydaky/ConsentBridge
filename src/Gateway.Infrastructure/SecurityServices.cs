@@ -1,10 +1,13 @@
-using System;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Gateway.Domain;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -44,21 +47,205 @@ public sealed class DefaultClientSecretHasher : IClientSecretHasher
     }
 }
 
-public sealed class DemoConsentTokenFactory : IConsentTokenFactory
+public sealed class JwtConsentTokenFactory : IConsentTokenFactory, IConsentKeyRotator
 {
-    private readonly TimeSpan _lifetime;
+    private const string ProtectorPurpose = "ConsentBridge.TenantKeys";
+    private const string DefaultAlgorithm = SecurityAlgorithms.EcdsaSha256;
 
-    public DemoConsentTokenFactory(TimeSpan? lifetime = null)
+    private readonly GatewayDbContext _db;
+    private readonly IDataProtector _protector;
+    private readonly ConsentTokenOptions _options;
+    private readonly ILogger<JwtConsentTokenFactory> _logger;
+    private readonly JwtSecurityTokenHandler _handler = new();
+    private readonly TimeSpan _tokenLifetime;
+    private readonly TimeSpan _keyLifetime;
+    private readonly TimeSpan _rotationLeadTime;
+
+    public JwtConsentTokenFactory(
+        GatewayDbContext db,
+        IDataProtectionProvider dataProtectionProvider,
+        IOptions<ConsentTokenOptions> options,
+        ILogger<JwtConsentTokenFactory> logger)
     {
-        _lifetime = lifetime ?? TimeSpan.FromDays(180);
+        _db = db;
+        _protector = dataProtectionProvider.CreateProtector(ProtectorPurpose);
+        _options = options.Value ?? throw new ArgumentNullException(nameof(options));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+        _tokenLifetime = TimeSpan.FromDays(Math.Max(1, _options.TokenLifetimeDays));
+        _keyLifetime = TimeSpan.FromDays(Math.Max(30, _options.KeyLifetimeDays));
+        _rotationLeadTime = TimeSpan.FromDays(Math.Clamp(_options.RotationLeadDays, 0, _options.KeyLifetimeDays));
     }
 
     public ConsentTokenIssueResult IssueToken(Consent consent, Candidate candidate)
     {
-        var tokenId = Guid.NewGuid();
-        var expires = DateTime.UtcNow.Add(_lifetime);
-        var token = $"ctok:{tokenId}";
-        return new ConsentTokenIssueResult(token, tokenId, expires);
+        if (consent is null) throw new ArgumentNullException(nameof(consent));
+        if (candidate is null) throw new ArgumentNullException(nameof(candidate));
+
+        var now = DateTime.UtcNow;
+        var tenant = _db.Tenants.FirstOrDefault(t => t.Slug == consent.AgentTenantId)
+            ?? throw new InvalidOperationException($"Tenant {consent.AgentTenantId} not found when issuing consent token.");
+
+        var signingKey = EnsureActiveKey(tenant, now);
+        using var ecdsa = CreateEcdsa(signingKey);
+        signingKey.LastUsedAt = now;
+
+        var jti = Guid.NewGuid();
+        var expires = now.Add(_tokenLifetime);
+        var claims = BuildClaims(consent, candidate, jti, now);
+
+        var credentials = new SigningCredentials(
+            new ECDsaSecurityKey(ecdsa)
+            {
+                KeyId = signingKey.KeyId
+            },
+            DefaultAlgorithm);
+
+        var token = new JwtSecurityToken(
+            issuer: _options.Issuer,
+            audience: consent.BoardTenantId,
+            claims: claims,
+            notBefore: now,
+            expires: expires,
+            signingCredentials: credentials);
+
+        var tokenString = _handler.WriteToken(token);
+        var tokenHash = ComputeHash(tokenString);
+
+        var record = new ConsentTokenRecord
+        {
+            Id = Guid.NewGuid(),
+            ConsentId = consent.Id,
+            TokenId = jti,
+            TokenHash = tokenHash,
+            KeyId = signingKey.KeyId,
+            Algorithm = signingKey.Algorithm,
+            IssuedAt = now,
+            ExpiresAt = expires
+        };
+        _db.ConsentTokens.Add(record);
+
+        consent.TokenId = jti;
+        consent.TokenIssuedAt = now;
+        consent.TokenExpiresAt = expires;
+        consent.TokenKeyId = signingKey.KeyId;
+        consent.TokenAlgorithm = signingKey.Algorithm;
+        consent.TokenHash = tokenHash;
+
+        _logger.LogInformation("Issued consent token {TokenId} for consent {ConsentId} using key {KeyId}", jti, consent.Id, signingKey.KeyId);
+
+        return new ConsentTokenIssueResult(tokenString, jti, now, expires, signingKey.KeyId, signingKey.Algorithm, tokenHash);
+    }
+
+    public async Task<TenantKey> RotateAsync(string tenantSlug, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(tenantSlug))
+        {
+            throw new ArgumentException("Tenant slug must be provided.", nameof(tenantSlug));
+        }
+
+        var tenant = await _db.Tenants.FirstOrDefaultAsync(t => t.Slug == tenantSlug, cancellationToken)
+            ?? throw new InvalidOperationException($"Tenant {tenantSlug} not found.");
+
+        var now = DateTime.UtcNow;
+        var current = await _db.TenantKeys
+            .Where(k => k.TenantId == tenant.Id && k.Purpose == TenantKeyPurpose.ConsentToken && k.Status == TenantKeyStatus.Active)
+            .OrderByDescending(k => k.ActivatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var newKey = RotateKey(tenant, current, now);
+        await _db.SaveChangesAsync(cancellationToken);
+        _logger.LogInformation("Debug rotation triggered for tenant {TenantSlug}. New key {KeyId} active until {Expires}.", tenantSlug, newKey.KeyId, newKey.ExpiresAt);
+        return newKey;
+    }
+
+    private TenantKey EnsureActiveKey(Tenant tenant, DateTime now)
+    {
+        var key = _db.TenantKeys
+            .Where(k => k.TenantId == tenant.Id && k.Purpose == TenantKeyPurpose.ConsentToken && k.Status == TenantKeyStatus.Active)
+            .OrderByDescending(k => k.ActivatedAt)
+            .FirstOrDefault();
+
+        if (key is not null && key.ExpiresAt > now && key.ExpiresAt - now > _rotationLeadTime)
+        {
+            return key;
+        }
+
+        return RotateKey(tenant, key, now);
+    }
+
+    private TenantKey RotateKey(Tenant tenant, TenantKey? current, DateTime now)
+    {
+        if (current is not null && current.Status == TenantKeyStatus.Active)
+        {
+            current.Status = TenantKeyStatus.Retired;
+            current.RetiredAt = now;
+        }
+
+        var keyId = $"ctok-{Guid.NewGuid():N}";
+        using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var privateKey = ecdsa.ExportPkcs8PrivateKey();
+        var publicParams = ecdsa.ExportParameters(false);
+
+        var jwk = new Dictionary<string, string>
+        {
+            ["kty"] = JsonWebAlgorithmsKeyTypes.EllipticCurve,
+            ["crv"] = JsonWebKeyECTypes.P256,
+            ["use"] = JsonWebKeyUseNames.Sig,
+            ["alg"] = DefaultAlgorithm,
+            ["kid"] = keyId,
+            ["x"] = Base64UrlEncoder.Encode(publicParams.Q.X),
+            ["y"] = Base64UrlEncoder.Encode(publicParams.Q.Y)
+        };
+
+        var publicJwk = JsonSerializer.Serialize(jwk);
+        var protectedPrivate = _protector.Protect(privateKey);
+
+        var newKey = new TenantKey
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenant.Id,
+            KeyId = keyId,
+            Purpose = TenantKeyPurpose.ConsentToken,
+            Status = TenantKeyStatus.Active,
+            Algorithm = DefaultAlgorithm,
+            PublicJwk = publicJwk,
+            PrivateKeyProtected = protectedPrivate,
+            CreatedAt = now,
+            ActivatedAt = now,
+            ExpiresAt = now.Add(_keyLifetime)
+        };
+
+        _db.TenantKeys.Add(newKey);
+        _logger.LogInformation("Generated new consent signing key {KeyId} for tenant {Tenant}", keyId, tenant.Slug);
+        return newKey;
+    }
+
+    private ECDsa CreateEcdsa(TenantKey key)
+    {
+        var raw = _protector.Unprotect(key.PrivateKeyProtected);
+        var ecdsa = ECDsa.Create();
+        ecdsa.ImportPkcs8PrivateKey(raw, out _);
+        return ecdsa;
+    }
+
+    private static IEnumerable<Claim> BuildClaims(Consent consent, Candidate candidate, Guid jti, DateTime issuedAt)
+    {
+        yield return new Claim(JwtRegisteredClaimNames.Sub, candidate.Id.ToString());
+        yield return new Claim("cid", consent.Id.ToString());
+        yield return new Claim("agent", consent.AgentTenantId);
+        yield return new Claim("board", consent.BoardTenantId);
+        yield return new Claim("scope", consent.Scopes);
+        yield return new Claim("ver", "1");
+        yield return new Claim(JwtRegisteredClaimNames.Jti, jti.ToString());
+        yield return new Claim(JwtRegisteredClaimNames.Iat, EpochTime.GetIntDate(issuedAt).ToString(), ClaimValueTypes.Integer64);
+    }
+
+    private static string ComputeHash(string token)
+    {
+        var bytes = Encoding.UTF8.GetBytes(token);
+        var hash = SHA256.HashData(bytes);
+        return Convert.ToHexString(hash);
     }
 }
 
@@ -114,4 +301,12 @@ public sealed class JwtAccessTokenOptions
     public string Audience { get; set; } = "consent-apply-gateway";
     public string SigningKey { get; set; } = string.Empty;
     public int AccessTokenLifetimeMinutes { get; set; } = 30;
+}
+
+public sealed class ConsentTokenOptions
+{
+    public string Issuer { get; set; } = "https://consentbridge.local";
+    public int TokenLifetimeDays { get; set; } = 180;
+    public int KeyLifetimeDays { get; set; } = 365;
+    public int RotationLeadDays { get; set; } = 30;
 }

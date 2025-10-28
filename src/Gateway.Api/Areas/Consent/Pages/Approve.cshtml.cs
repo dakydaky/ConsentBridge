@@ -95,14 +95,18 @@ public class ApproveModel : PageModel
             Status = ConsentStatus.Active,
             IssuedAt = issuedAt,
             ExpiresAt = issuedAt.AddMonths(6),
-            TokenExpiresAt = issuedAt.AddMonths(6),
+            TokenExpiresAt = issuedAt,
             Scopes = RequestEntity.Scopes,
             ApprovedByEmail = normalizedEmail
         };
 
         var issued = _tokenFactory.IssueToken(consent, candidate);
         consent.TokenId = issued.TokenId;
+        consent.TokenIssuedAt = issued.IssuedAt;
         consent.TokenExpiresAt = issued.ExpiresAt;
+        consent.TokenKeyId = issued.KeyId;
+        consent.TokenAlgorithm = issued.Algorithm;
+        consent.TokenHash = issued.TokenHash;
         consent.ExpiresAt = issued.ExpiresAt;
 
         _db.Consents.Add(consent);
