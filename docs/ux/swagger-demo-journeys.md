@@ -29,6 +29,9 @@ This note documents the current end-to-end flows we can showcase via Swagger (`h
 
 3. **Submit an application**
    - Generate the detached JWS signature (use `demo.ps1` with your payload) and include it as `X-JWS-Signature`.
+     - `docs/ux/demo-application-payload.json` contains the sample body below; update `ConsentToken` with the value from the web approval.
+     - Run `pwsh ./demo.ps1 -PayloadPath ./docs/ux/demo-application-payload.json` to produce the header value.
+       The script prints the canonical payload and the value to copy into the `X-JWS-Signature` header.
    - Endpoint: `POST /v1/applications`
    - Headers: `Authorization: Bearer <token>` and `X-JWS-Signature: detached JWS`
    - Body example (swap in real `ConsentToken`):

@@ -12,9 +12,7 @@ if (-not (Test-Path $PayloadPath)) {
 }
 
 function Convert-ToBase64Url([byte[]] $bytes) {
-    [Convert]::ToBase64String($bytes).TrimEnd('=') `
-        .Replace('+', '-') `
-        .Replace('/', '_')
+    [Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
 }
 
 $payloadJson = Get-Content $PayloadPath -Raw

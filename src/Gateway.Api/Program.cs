@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using Gateway.Api;
@@ -15,6 +14,9 @@ using Serilog;
 using System.Linq;
 using System.Net.Http.Json;
 using System.Text;
+using Microsoft.AspNetCore.DataProtection;
+using System.IO;
+using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -92,6 +94,16 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("apply.submit", policy =>
         policy.RequireAssertion(ctx => HasScope(ctx.User, "apply.submit")));
 });
+
+var keyPath = builder.Configuration.GetValue<string>("DataProtection:KeyPath") ?? "/app/dataprotection";
+if (!Path.IsPathRooted(keyPath))
+{
+    keyPath = Path.Combine(builder.Environment.ContentRootPath, keyPath);
+}
+Directory.CreateDirectory(keyPath);
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(keyPath))
+    .SetApplicationName("ConsentBridge.Gateway");
 
 builder.Services.AddRazorPages();
 var app = builder.Build();

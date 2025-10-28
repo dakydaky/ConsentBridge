@@ -1,0 +1,40 @@
+{
+  "ConsentToken": "ctok:4c23dd67-13e9-41a4-b412-92ea664f8e11",
+  "Candidate": {
+    "Id": "cand_123",
+    "Contact": {
+      "Email": "alice@example.com",
+      "Phone": "+45 1234"
+    },
+    "Pii": {
+      "FirstName": "Alice",
+      "LastName": "Larsen"
+    },
+    "Cv": {
+      "Url": "https://example/cv.pdf",
+      "Sha256": "deadbeef"
+    }
+  },
+  "Job": {
+    "ExternalId": "mock:98765",
+    "Title": "Backend Engineer",
+    "Company": "ACME GmbH",
+    "ApplyEndpoint": "quick-apply"
+  },
+  "Materials": {
+    "CoverLetter": {
+      "Text": "Hello MockBoard!"
+    },
+    "Answers": [
+      {
+        "QuestionId": "q_legal_work",
+        "AnswerText": "Yes"
+      }
+    ]
+  },
+  "Meta": {
+    "Locale": "de-DE",
+    "UserAgent": "agent/0.1",
+    "Ts": "2025-10-27T10:15:00Z"
+  }
+}

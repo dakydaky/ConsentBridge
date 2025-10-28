@@ -37,3 +37,11 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       MOCKBOARD_URL: http://mockboard:8081
     ports: ["8080:8080"]
+    volumes:
+      - gateway_dataprotection:/app/dataprotection
+
+
+
+volumes:
+  gateway_dataprotection:
+
