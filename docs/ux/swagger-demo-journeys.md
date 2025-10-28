@@ -1,129 +1,116 @@
-# Swagger Demo Journeys (v0.1)
+# 🌉 ConsentBridge Swagger Journeys (v0.2)
 
-This note documents the current end-to-end flows we can showcase via Swagger (`http://localhost:8080/swagger`) using the demo scaffold. Update as new endpoints and auth pieces come online.
-
----
-
-## Journey A - Agent applies with active consent (current happy path)
-
-**Goal**: Show that the gateway can accept an application on behalf of a candidate and persist the outcome while forwarding to the MockBoard adapter.
-
-1. **Create a consent request**
-   - Endpoint: `POST /v1/consent-requests`
-   - Headers: `Authorization: Bearer <token>` (obtain via Journey C)
-   - Body example:
-     ```json
-     {
-       "CandidateEmail": "alice@example.com",
-       "AgentTenantId": "agent_acme",
-       "BoardTenantId": "mockboard_eu",
-       "Scopes": ["apply.submit"]
-     }
-     ```
-   - Expected response: `202 Accepted` with `request_id` and a link to `/consent/{id}`.
-   - Demo note: The OTP code is written to the API logs so you can complete the flow locally.
-
-2. **Complete the web approval**
-   - Visit `http://localhost:8080/consent/{request_id}`.
-   - Enter the OTP, verify your email, and approve the consent. The success page displays the `consent_token`.
-
-3. **Submit an application**
-   - Generate the detached JWS signature (use `demo.ps1` with your payload) and include it as `X-JWS-Signature`.
-     - `docs/ux/demo-application-payload.json` contains the sample body below; update `consentToken` with the value from the web approval.
-     - Run `pwsh ./demo.ps1 -PayloadPath ./docs/ux/demo-application-payload.json`.
-       The script loads the ES256 private key at `certs/agent_acme_private.jwk.json` by default (override with `-PrivateJwkPath` if rotated) and prints the canonical JSON plus the value to copy into the `X-JWS-Signature` header.
-   - Endpoint: `POST /v1/applications`
-   - Headers: `Authorization: Bearer <token>` and `X-JWS-Signature: detached JWS`
-   - Body example (swap in real `consentToken`):
-     ```json
-     {
-       "consentToken": "ctok:REPLACE",
-       "candidate": {
-         "id": "cand_123",
-         "contact": { "email": "alice@example.com", "phone": "+45 1234" },
-         "pii": { "firstName": "Alice", "lastName": "Larsen" },
-         "cv": { "url": "https://example/cv.pdf", "sha256": "deadbeef" }
-       },
-       "job": {
-         "externalId": "mock:98765",
-         "title": "Backend Engineer",
-         "company": "ACME GmbH",
-         "applyEndpoint": "quick-apply"
-       },
-       "materials": {
-         "coverLetter": { "text": "Hello MockBoard!" },
-         "answers": [{ "questionId": "q_legal_work", "answerText": "Yes" }]
-       },
-       "meta": { "locale": "de-DE", "userAgent": "agent/0.1", "ts": "2025-10-27T10:15:00Z" }
-     }
-     ```
-   - Expected response: `202 Accepted` with application `id` and `status: Accepted`.
-   - Behind the scenes: record is persisted with receipt payload from MockBoard; signature verification is now enforced.
-
-4. **Review via API**
-   - Endpoint: `GET /v1/applications/{id}`
-   - Expected response: `200 OK` with canonical payload hash, submission metadata (`submissionSignature`, `submissionKeyId`, `submissionAlgorithm`), and the board receipt fields (`receipt`, `receiptSignature`, `receiptHash`).
-   - Optional: open `http://localhost:8080/applications/{id}` to see the stored receipt payload and signature in the portal.
+Welcome! These curated “choose‑your‑perspective” guides help you demo the platform directly from `http://localhost:8080/swagger`. Pick a persona, follow the steps, and point stakeholders at the parts they care about most.
 
 ---
 
-## Journey B – Consent lifecycle & revocation (current behavior)
+## 🕵️ Agent Operator — “Can I submit safely?”
 
-**Goal**: Demonstrate consent issuance, retrieval, and revocation via API, highlighting future auth hooks.
+1. **🔐 Authenticate**
+   - `POST /oauth/token`
+   - Body: `grant_type=client_credentials&client_id=agent_acme_client&client_secret=agent-secret&scope=apply.submit`
+   - Copy the `access_token` → Swagger “Authorize…”
 
-1. **Initiate consent** - same as step A1.
-2. **Inspect consent** *(future)*:
-   - Planned endpoint: `GET /v1/consents/{id}` (not yet implemented).
-   - Will require tenant-auth (bearer token from `/oauth/token`).
-3. **Revoke consent**
-   - Endpoint: `POST /v1/consents/{id}/revoke`
-   - Expected response: `204 No Content`.
-   - After revocation, repeat Journey A step 2 with the same token → expect `403 Forbid`.
+2. **🆗 Trigger consent**
+   - `POST /v1/consent-requests`
+   - Body: `{"CandidateEmail":"alice@example.com","AgentTenantId":"agent_acme","BoardTenantId":"mockboard_eu","Scopes":["apply.submit"]}`
+   - Grab the `request_id` from the response.
+
+3. **📬 Approve the OTP flow (browser)**
+   - Visit `http://localhost:8080/consent/{request_id}`
+   - OTP is logged to the gateway console; approve to reveal the `consentToken`.
+
+4. **🖋️ Sign the application payload**
+   - Update `docs/ux/demo-application-payload.json` with the real `consentToken`.
+   - Run `pwsh ./demo.ps1 -PayloadPath ./docs/ux/demo-application-payload.json`
+   - Copy:
+     - Canonical JSON → request body.
+     - Printed value → `X-JWS-Signature`.
+
+5. **📤 Submit the application**
+   - `POST /v1/applications`
+   - Headers: `Authorization: Bearer <token>`, `X-JWS-Signature: <value>`
+   - Body: canonical JSON from the script.
+   - Expect `202 Accepted` with `{id, status: Accepted}`.
+
+6. **🧾 Review provenance**
+   - `GET /v1/applications/{id}` → verify `submissionSignature`, `submissionKeyId`, `receiptSignature`, `receiptHash`.
+   - Bonus: open `http://localhost:8080/applications/{id}` for a gallery-style view.
 
 ---
 
-## Journey C - Tenant auth (`/oauth/token`)
+## 🧑‍💼 Hiring Board — “Show me my receipt proof”
 
-- **Obtain access token**
-  - Endpoint: `POST /oauth/token`
-  - Content-Type: `application/x-www-form-urlencoded` (or `application/json` when calling from Swagger)
-  - Body example (URL-encoded):
-    ```
-    grant_type=client_credentials&
-    client_id=agent_acme_client&
-    client_secret=agent-secret&
-    scope=apply.submit
-    ```
-    
-    ```
-  - Expected response: `200 OK`
-    ```json
-    {
-      "access_token": "<JWT>",
-      "token_type": "Bearer",
-      "expires_in": 1800,
-      "scope": "apply.submit"
-    }
-    ```
-  - Returned JWT includes claims for tenant slug (`sub`), tenant id, tenant type, client id, and scopes.
-  - Enforcement on `/v1/applications` is still pending; note this to viewers.
-  - After receiving the token, click Swagger's **Authorize** button and paste `Bearer <token>` so subsequent calls include the header automatically.
-  - **Swagger tip:** send the body as JSON if you cannot set the form URL-encoded content type:
-    ```json
-    {
-      "grantType": "client_credentials",
-      "clientId": "agent_acme_client",
-      "clientSecret": "agent-secret",
-      "scope": "apply.submit"
-    }
-    ```
+1. **🔐 Authenticate as board**
+   - `POST /oauth/token` with board credentials (`client_id=mockboard_client`, `client_secret=board-secret`).
+   - Authorize Swagger.
 
-- **Consent web flow**
-  - Not yet exposed in Swagger.
-  - Will replace direct `POST /v1/consents` with browser-based approval, then the API will issue the consent token through `IConsentTokenFactory`.
-Track progress in:
-- `docs/adr/0001-consent-ux-auth.md`
-- `docs/design/consent-ux-auth-foundation.md`
-- `TODO.md` (Consent UX & Auth section)
+2. **🗃️ List applications destined for you**
+   - `GET /v1/applications/{id}` (use the ID from the agent flow).
+   - Check:
+     - `boardTenantId == "mockboard_eu"`
+     - `status == Accepted`
+     - `receiptSignature` and `receiptHash` present.
 
-Update this file after each milestone to keep product demos and investor walkthroughs consistent.
+3. **📄 Inspect the receipt payload**
+   - Use the portal page `http://localhost:8080/applications/{id}` to show the signed receipt JSON and matching signature.
+
+4. **🔑 Confirm key provenance**
+   - `GET /.well-known/jwks.json`
+   - Demonstrate that MockBoard’s public key (`kid: mockboard-key`) is published alongside the agent key.
+
+5. **🧭 Rely on provenance**
+   - Show how `receiptHash` ties the stored payload to the signed response (SHA‑256).
+   - Mention the roadmap item for surfacing this in recruiter UX dashboards.
+
+---
+
+## 👩‍⚖️ Privacy Lead — “Does this respect GDPR?”
+
+Use Swagger to back up compliance talking points:
+
+1. **🔐 Lawful basis (consent)**
+   - Demonstrate the consent request + OTP approval (steps in Agent journey).
+   - Emphasize retention policy references in `docs/security/cryptography-and-compliance.md`.
+
+2. **🔒 Integrity & audit**
+   - `POST /v1/applications`: highlight enforcement of `X-JWS-Signature`.
+   - `GET /v1/applications/{id}`: show `submissionSignature`, `submissionKeyId`, `submissionAlgorithm`, `receiptSignature`, `receiptHash`.
+
+3. **🔑 Public key transparency**
+   - `GET /.well-known/jwks.json`: explain how tenants can verify keys before trusting receipts.
+
+4. **🗑️ Data subject rights (roadmap)**
+   - Point out TODO entries mentioning DSR export/delete endpoints and retention automation.
+
+5. **🛡️ Next steps**
+   - Mention planned key rotation tooling and JWKS hosting in production to bolster compliance posture.
+
+---
+
+## 🧪 Engineer — “Breaking tests & failure drills”
+
+1. **❌ Signature failure drill**
+   - Change the JWS header `kid` before posting to `/v1/applications` → expect `400 invalid_signature`.
+
+2. **🔁 Replay prevention (demo)**
+   - Re-submit the same application ID; we store idempotent application records, but real duplicate protection is a roadmap item.
+
+3. **⚠️ Receipt tampering**
+   - Manually edit the receipt JSON from MockBoard and post it back → observe `502` as verification fails.
+
+4. **🔄 JWKS rotation rehearsal**
+   - Swap the JWKS file for MockBoard, restart gateway, re-run the submission to confirm verification switches to the new key.
+
+---
+
+## ✅ Quick Reference
+
+| Persona | Key endpoints | Stories to tell |
+| ------- | ------------- | --------------- |
+| 🕵️ Agent | `/oauth/token`, `/v1/consent-requests`, `/v1/applications`, `/v1/applications/{id}` | End-to-end submission with ES256 signature |
+| 🧑‍💼 Board | `/v1/applications/{id}`, `/.well-known/jwks.json` | Receipts & provenance proof |
+| 👩‍⚖️ Privacy | `/v1/consent-requests`, `/v1/applications`, `/.well-known/jwks.json` | GDPR-aligned controls & roadmap gaps |
+| 🧪 Engineer | `/v1/applications`, `/.well-known/jwks.json` | Failure drills & key rotation rehearsal |
+
+Happy demoing! 🎉

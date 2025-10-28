@@ -100,6 +100,9 @@ public class ReceiptSignatureTests
 
         public bool TryGetKeys(string tenantSlug, out JsonWebKeySet? jwks) =>
             _map.TryGetValue(tenantSlug, out jwks);
+
+        public IEnumerable<KeyValuePair<string, JsonWebKeySet>> GetAll() =>
+            _map.ToArray();
     }
 
     private sealed class TestHostEnvironment : IHostEnvironment

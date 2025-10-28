@@ -108,10 +108,34 @@ paths:
 
   /.well-known/jwks.json:
     get:
-      summary: Platform JWKS (planned)
+      summary: Tenant signing keys (JWKS)
       responses:
         '200':
           description: JSON Web Key Set
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  keys:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        kty:
+                          type: string
+                        use:
+                          type: string
+                        alg:
+                          type: string
+                        kid:
+                          type: string
+                        crv:
+                          type: string
+                        x:
+                          type: string
+                        y:
+                          type: string
 
 components:
   securitySchemes:
@@ -306,3 +330,4 @@ components:
           nullable: true
         payloadHash:
           type: string
+

@@ -9,6 +9,7 @@ namespace Gateway.Infrastructure;
 public interface ITenantKeyStore
 {
     bool TryGetKeys(string tenantSlug, out JsonWebKeySet? jwks);
+    IEnumerable<KeyValuePair<string, JsonWebKeySet>> GetAll();
 }
 
 public sealed class ConfigurationTenantKeyStore : ITenantKeyStore
@@ -58,6 +59,9 @@ public sealed class ConfigurationTenantKeyStore : ITenantKeyStore
 
     public bool TryGetKeys(string tenantSlug, out JsonWebKeySet? jwks) =>
         _cache.TryGetValue(tenantSlug, out jwks);
+
+    public IEnumerable<KeyValuePair<string, JsonWebKeySet>> GetAll() =>
+        _cache.ToArray();
 
     private sealed class DemoTenantKeyConfig
     {

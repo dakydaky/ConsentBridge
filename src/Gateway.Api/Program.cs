@@ -134,6 +134,31 @@ app.UseAuthorization();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
+app.MapGet("/.well-known/jwks.json", (ITenantKeyStore keyStore) =>
+{
+    var response = new
+    {
+        keys = keyStore.GetAll()
+            .SelectMany(entry => entry.Value.Keys.Select(k => new
+            {
+                kty = k.Kty,
+                use = k.Use,
+                alg = string.IsNullOrWhiteSpace(k.Alg) ? "ES256" : k.Alg,
+                kid = k.Kid,
+                crv = k.Crv,
+                x = k.X,
+                y = k.Y
+            }))
+    };
+
+    return Results.Json(response);
+}).WithTags("Public")
+  .WithOpenApi(op =>
+  {
+      op.Summary = "Tenant signing keys (JWKS)";
+      return op;
+  });
+
 // Create Consent (simplified for demo usage)
 
 // Create consent request (agent-triggered)
