@@ -12,10 +12,15 @@ if (-not (Test-Path $PayloadPath)) {
 }
 
 function Convert-ToBase64Url([byte[]] $bytes) {
-    [Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+    ([Convert]::ToBase64String($bytes)).TrimEnd('=').Replace('+', '-').Replace('/', '_')
 }
 
 $payloadJson = Get-Content $PayloadPath -Raw
+
+$jsonDocument = [System.Text.Json.JsonDocument]::Parse($payloadJson)
+$serializerOptions = [System.Text.Json.JsonSerializerOptions]::new([System.Text.Json.JsonSerializerDefaults]::Web)
+$serializerOptions.WriteIndented = $false
+$canonicalJson = [System.Text.Json.JsonSerializer]::Serialize($jsonDocument.RootElement, $serializerOptions)
 
 $header = @{
     alg = "HS256"
@@ -24,18 +29,18 @@ $header = @{
 } | ConvertTo-Json -Compress
 
 $headerEncoded = Convert-ToBase64Url([System.Text.Encoding]::UTF8.GetBytes($header))
-$payloadEncoded = Convert-ToBase64Url([System.Text.Encoding]::UTF8.GetBytes($payloadJson))
+$payloadEncoded = Convert-ToBase64Url([System.Text.Encoding]::UTF8.GetBytes($canonicalJson))
 
 $signingInput = "$headerEncoded.$payloadEncoded"
-$hmac = New-Object System.Security.Cryptography.HMACSHA256 ([System.Text.Encoding]::UTF8.GetBytes($Secret))
+$keyBytes = [System.Text.Encoding]::UTF8.GetBytes($Secret)
+$hmac = [System.Security.Cryptography.HMACSHA256]::new($keyBytes)
 $signatureBytes = $hmac.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($signingInput))
 $signatureEncoded = Convert-ToBase64Url($signatureBytes)
 
 $jws = "$headerEncoded.$payloadEncoded.$signatureEncoded"
 
 Write-Host "Payload JSON (canonicalised):"
-Write-Host $payloadJson
+Write-Host $canonicalJson
 Write-Host ""
 Write-Host "X-JWS-Signature header value:"
 Write-Host $jws
-Write-Output $jws

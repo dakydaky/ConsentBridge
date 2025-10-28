@@ -29,32 +29,32 @@ This note documents the current end-to-end flows we can showcase via Swagger (`h
 
 3. **Submit an application**
    - Generate the detached JWS signature (use `demo.ps1` with your payload) and include it as `X-JWS-Signature`.
-     - `docs/ux/demo-application-payload.json` contains the sample body below; update `ConsentToken` with the value from the web approval.
-     - Run `pwsh ./demo.ps1 -PayloadPath ./docs/ux/demo-application-payload.json` to produce the header value.
-       The script prints the canonical payload and the value to copy into the `X-JWS-Signature` header.
+     - `docs/ux/demo-application-payload.json` contains the sample body below; update `consentToken` with the value from the web approval.
+     - Run `pwsh ./demo.ps1 -PayloadPath ./docs/ux/demo-application-payload.json`.
+       The script prints the canonical JSON and the value to copy into the `X-JWS-Signature` header—use that canonical payload as the request body.
    - Endpoint: `POST /v1/applications`
    - Headers: `Authorization: Bearer <token>` and `X-JWS-Signature: detached JWS`
    - Body example (swap in real `ConsentToken`):
      ```json
      {
-       "ConsentToken": "ctok:REPLACE",
-       "Candidate": {
-         "Id": "cand_123",
-         "Contact": { "Email": "alice@example.com", "Phone": "+45 1234" },
-         "Pii": { "FirstName": "Alice", "LastName": "Larsen" },
-         "Cv": { "Url": "https://example/cv.pdf", "Sha256": "deadbeef" }
+       "consentToken": "ctok:REPLACE",
+       "candidate": {
+         "id": "cand_123",
+         "contact": { "email": "alice@example.com", "phone": "+45 1234" },
+         "pii": { "firstName": "Alice", "lastName": "Larsen" },
+         "cv": { "url": "https://example/cv.pdf", "sha256": "deadbeef" }
        },
-       "Job": {
-         "ExternalId": "mock:98765",
-         "Title": "Backend Engineer",
-         "Company": "ACME GmbH",
-         "ApplyEndpoint": "quick-apply"
+       "job": {
+         "externalId": "mock:98765",
+         "title": "Backend Engineer",
+         "company": "ACME GmbH",
+         "applyEndpoint": "quick-apply"
        },
-       "Materials": {
-         "CoverLetter": { "Text": "Hello MockBoard!" },
-         "Answers": [{ "QuestionId": "q_legal_work", "AnswerText": "Yes" }]
+       "materials": {
+         "coverLetter": { "text": "Hello MockBoard!" },
+         "answers": [{ "questionId": "q_legal_work", "answerText": "Yes" }]
        },
-       "Meta": { "Locale": "de-DE", "UserAgent": "agent/0.1", "Ts": "2025-10-27T10:15:00Z" }
+       "meta": { "locale": "de-DE", "userAgent": "agent/0.1", "ts": "2025-10-27T10:15:00Z" }
      }
      ```
    - Expected response: `202 Accepted` with application `id` and `status: Accepted`.
