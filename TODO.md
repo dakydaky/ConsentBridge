@@ -26,3 +26,4 @@ Deployment Assets – Replace placeholder .gitkeep charts/manifests with real He
 Documentation & Storytelling – Expand README with architecture diagrams, API walkthroughs, and troubleshooting; align Swagger metadata with the published OpenAPI in docs/api/openapi.yaml.
 
 
+\nMockBoard UX\n- [x] Add Razor-based dashboard with recent applies\n- [ ] Surface real payload details (parse JSON)\n- [ ] Signed receipt display & download

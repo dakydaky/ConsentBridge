@@ -1,0 +1,112 @@
+@{
+    var title = ViewData["Title"] as string ?? "MockBoard EU";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@title</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: linear-gradient(135deg, #0d172a, #111c32);
+            color: #f4f7ff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1.25rem 2rem;
+            background: rgba(10, 18, 38, 0.75);
+            border-bottom: 1px solid rgba(82, 109, 255, 0.35);
+            backdrop-filter: blur(12px);
+        }
+        header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+        header nav a {
+            color: #c2d4ff;
+            text-decoration: none;
+            margin-left: 1.5rem;
+            font-weight: 600;
+        }
+        main {
+            flex: 1;
+            padding: 2.5rem;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            width: min(960px, 100%);
+        }
+        footer {
+            text-align: center;
+            padding: 1.5rem 2rem;
+            color: rgba(194, 212, 255, 0.65);
+            font-size: 0.9rem;
+        }
+        .card {
+            border-radius: 20px;
+            padding: 2rem;
+            background: rgba(13, 22, 45, 0.78);
+            box-shadow: 0 24px 60px rgba(13, 20, 44, 0.45);
+            border: 1px solid rgba(94, 125, 255, 0.3);
+            margin-bottom: 2rem;
+        }
+        a.btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.75rem 1.4rem;
+            border-radius: 999px;
+            background: linear-gradient(120deg, #5a7aff, #71a8ff);
+            color: #fff;
+            text-decoration: none;
+            font-weight: 600;
+            box-shadow: 0 16px 30px rgba(90, 122, 255, 0.35);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1.5rem;
+        }
+        table th, table td {
+            padding: 0.85rem 0;
+            border-bottom: 1px solid rgba(150, 170, 255, 0.12);
+        }
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 0.85rem;
+            border-radius: 999px;
+            background: rgba(90, 122, 255, 0.2);
+            color: #bcd1ff;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>MockBoard EU</h1>
+        <nav>
+            <a href="/">Dashboard</a>
+            <a href="/docs">Integration Docs</a>
+        </nav>
+    </header>
+    <main>
+        <div class="container">
+            @RenderBody()
+        </div>
+    </main>
+    <footer>
+        MockBoard EU • Demo adapter for ConsentBridge.
+    </footer>
+</body>
+</html>

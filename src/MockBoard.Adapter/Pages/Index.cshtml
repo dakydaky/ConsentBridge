@@ -1,0 +1,49 @@
+@page
+@model MockBoard.Adapter.Pages.IndexModel
+@{
+    ViewData["Title"] = "MockBoard Dashboard";
+}
+
+<div class="card">
+    <div class="badge">LIVE</div>
+    <h2>Job Apply Queue</h2>
+    <p>Recent quick-apply submissions coming from ConsentBridge.</p>
+
+    @if (Model.Applications.Count == 0)
+    {
+        <p>No applications yet. Trigger a consent flow and submit an application to see it appear here.</p>
+    }
+    else
+    {
+        <table>
+            <thead>
+                <tr>
+                    <th>Received</th>
+                    <th>Candidate</th>
+                    <th>Job</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var app in Model.Applications)
+            {
+                <tr>
+                    <td>@app.ReceivedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                    <td>@app.CandidateEmail</td>
+                    <td>@app.JobTitle</td>
+                    <td>@app.Status</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+</div>
+
+<div class="card">
+    <h2>Board Integration Docs</h2>
+    <p>Use the quick links below to reference our integration materials.</p>
+    <div class="btn-row">
+        <a class="btn" href="/docs">View docs</a>
+        <a class="btn" href="mailto:api@mockboard.eu">Contact support</a>
+    </div>
+</div>

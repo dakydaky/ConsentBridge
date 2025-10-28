@@ -1,0 +1,21 @@
+@page
+@model MockBoard.Adapter.Pages.DocsModel
+@{
+    ViewData["Title"] = "MockBoard Integration Guide";
+}
+
+<div class="card">
+    <div class="badge">API Docs</div>
+    <h2>ConsentBridge → MockBoard Quickstart</h2>
+    <ol>
+        <li>Provision your tenant on ConsentBridge and obtain credentials.</li>
+        <li>Use `/v1/consent-requests` to initiate candidate consent.</li>
+        <li>Once approved, submit applications to `<base>/v1/mock/applications` with the consent token + signed payload.</li>
+        <li>We return a signed receipt containing `board_ref` and status.</li>
+    </ol>
+</div>
+
+<div class="card">
+    <h2>Webhook Endpoints</h2>
+    <p>Coming soon – we will expose a `/v1/mock/status` webhook for status updates.</p>
+</div>
