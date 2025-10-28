@@ -8,7 +8,15 @@ Welcome! These curated “choose‑your‑perspective” guides help you demo th
 
 1. **🔐 Authenticate**
    - `POST /oauth/token`
-   - Body: `grant_type=client_credentials&client_id=agent_acme_client&client_secret=agent-secret&scope=apply.submit`
+   - Body (JSON):
+     ```json
+     {
+       "grantType": "client_credentials",
+       "clientId": "agent_acme_client",
+       "clientSecret": "agent-secret",
+       "scope": "apply.submit"
+     }
+     ```
    - Copy the `access_token` → Swagger “Authorize…”
 
 2. **🆗 Trigger consent**
@@ -42,8 +50,17 @@ Welcome! These curated “choose‑your‑perspective” guides help you demo th
 ## 🧑‍💼 Hiring Board — “Show me my receipt proof”
 
 1. **🔐 Authenticate as board**
-   - `POST /oauth/token` with board credentials (`client_id=mockboard_client`, `client_secret=board-secret`).
-   - Authorize Swagger.
+   - `POST /oauth/token`
+   - Body (JSON):
+     ```json
+     {
+       "grantType": "client_credentials",
+       "clientId": "mockboard_client",
+       "clientSecret": "board-secret",
+       "scope": "apply.submit"
+     }
+     ```
+   - Authorize Swagger with the returned token.
 
 2. **🗃️ List applications destined for you**
    - `GET /v1/applications/{id}` (use the ID from the agent flow).
