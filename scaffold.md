@@ -9,7 +9,7 @@ Below is a complete repo scaffold you can paste into a new folder. It includes:
 
 > Notes:
 >
-> * Targets **.NET 8** (LTS). Upgrade to 9 when ready.
+> * Targets **.NET 9** (LTS).
 > * For demo, **crypto verification is stubbed** to keep first run simple; the interface is ready for a real JWS verifier later.
 > * EF Core applies migrations automatically on boot.
 
