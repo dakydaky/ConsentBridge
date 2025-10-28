@@ -29,13 +29,44 @@ public sealed class DataRetentionExecutor
         var receiptCutoff = now.AddDays(-_options.ApplicationReceiptDays);
         var consentRequestCutoff = now.AddDays(-_options.ConsentRequestDays);
 
-        var receiptsCleared = await _db.Applications
-            .Where(a => a.SubmittedAt <= receiptCutoff && a.Receipt != null)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(a => a.Receipt, a => null), cancellationToken);
+        int receiptsCleared = 0;
+        int consentRequestsDeleted = 0;
 
-        var consentRequestsDeleted = await _db.ConsentRequests
-            .Where(cr => cr.CreatedAt <= consentRequestCutoff)
-            .ExecuteDeleteAsync(cancellationToken);
+        if (SupportsBulkOperations())
+        {
+            receiptsCleared = await _db.Applications
+                .Where(a => a.SubmittedAt <= receiptCutoff && a.Receipt != null)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(a => a.Receipt, a => null), cancellationToken);
+
+            consentRequestsDeleted = await _db.ConsentRequests
+                .Where(cr => cr.CreatedAt <= consentRequestCutoff)
+                .ExecuteDeleteAsync(cancellationToken);
+        }
+        else
+        {
+            var expiredApplications = await _db.Applications
+                .Where(a => a.SubmittedAt <= receiptCutoff)
+                .ToListAsync(cancellationToken);
+            foreach (var application in expiredApplications)
+            {
+                if (application.Receipt is not null)
+                {
+                    application.Receipt = null;
+                    receiptsCleared++;
+                }
+            }
+
+            var expiredRequests = await _db.ConsentRequests
+                .Where(cr => cr.CreatedAt <= consentRequestCutoff)
+                .ToListAsync(cancellationToken);
+            consentRequestsDeleted = expiredRequests.Count;
+            _db.ConsentRequests.RemoveRange(expiredRequests);
+
+            if (receiptsCleared > 0 || consentRequestsDeleted > 0)
+            {
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+        }
 
         if (receiptsCleared > 0 || consentRequestsDeleted > 0)
         {
@@ -47,5 +78,12 @@ public sealed class DataRetentionExecutor
         }
 
         return new RetentionCleanupResult(receiptsCleared, consentRequestsDeleted);
+    }
+
+    private bool SupportsBulkOperations()
+    {
+        var provider = _db.Database.ProviderName;
+        return provider is not null &&
+            !provider.Contains("InMemory", StringComparison.OrdinalIgnoreCase);
     }
 }
