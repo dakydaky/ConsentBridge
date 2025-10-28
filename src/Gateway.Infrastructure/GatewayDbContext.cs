@@ -15,7 +15,7 @@ public class GatewayDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder b)
     {
-        b.HasPostgresExtension("uuid-ossp", schema: null, database: null);
+        b.HasPostgresExtension("uuid-ossp");
         b.Entity<Candidate>().HasIndex(x => x.EmailHash).IsUnique();
         b.Entity<Consent>().HasOne(c => c.Candidate).WithMany().HasForeignKey(c => c.CandidateId);
         b.Entity<Application>().HasOne(a => a.Consent).WithMany().HasForeignKey(a => a.ConsentId);
