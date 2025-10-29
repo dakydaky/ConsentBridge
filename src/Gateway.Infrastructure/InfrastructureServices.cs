@@ -28,6 +28,9 @@ public static class InfrastructureServices
         services.AddScoped<IConsentKeyRotator>(sp =>
             (JwtConsentTokenFactory)sp.GetRequiredService<IConsentTokenFactory>());
         services.AddScoped<IDsrService, DsrService>();
+        services.Configure<ConsentLifecycleOptions>(configuration.GetSection("ConsentLifecycle"));
+        services.AddScoped<IConsentLifecycleService, ConsentLifecycleService>();
+        services.AddSingleton<IAuditEventSink, DefaultAuditEventSink>();
         services.Configure<RetentionOptions>(configuration.GetSection("Retention"));
         services.Configure<ConsentTokenOptions>(configuration.GetSection("ConsentTokens"));
         services.AddScoped<DataRetentionExecutor>();
