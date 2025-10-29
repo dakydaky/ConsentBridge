@@ -19,6 +19,7 @@ public class IndexModel : PageModel
     }
 
     public IReadOnlyList<ConsentRequestItem> PendingRequests => _state.Consents;
+    public IReadOnlyList<CandidateItem> Candidates => _state.Candidates;
     public IReadOnlyList<AgentApiClient.ConsentView> Consents { get; private set; } = Array.Empty<AgentApiClient.ConsentView>();
     public IReadOnlyList<ApplicationItem> Applications => _state.Applications;
 
@@ -34,5 +35,17 @@ public class IndexModel : PageModel
             _logger.LogWarning(ex, "Failed to load consents from API");
             Consents = Array.Empty<AgentApiClient.ConsentView>();
         }
+    }
+
+    public async Task<IActionResult> OnPostRevokeAsync(Guid id)
+    {
+        try { await _api.RevokeConsentAsync(id); } catch (Exception ex) { _logger.LogWarning(ex, "Revoke failed"); }
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostRenewAsync(Guid id)
+    {
+        try { await _api.RenewConsentAsync(id); } catch (Exception ex) { _logger.LogWarning(ex, "Renew failed"); }
+        return RedirectToPage();
     }
 }

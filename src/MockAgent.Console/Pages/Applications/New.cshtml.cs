@@ -44,7 +44,14 @@ public class NewModel : PageModel
 
     public async Task<IActionResult> OnPostAsync()
     {
-        if (!ModelState.IsValid) return Page();
+        if (!ModelState.IsValid) { await LoadConsentsAsync(); return Page(); }
+
+        if (!SelectedConsentId.HasValue && string.IsNullOrWhiteSpace(ConsentToken))
+        {
+            ModelState.AddModelError("ConsentToken", "Select an approved consent or paste a consent token (JWT).");
+            await LoadConsentsAsync();
+            return Page();
+        }
 
         // If the user selected a consent and did not paste a JWT, use ctok:{tokenId}
         if (SelectedConsentId.HasValue && string.IsNullOrWhiteSpace(ConsentToken))

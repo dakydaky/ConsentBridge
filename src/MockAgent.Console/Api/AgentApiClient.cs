@@ -100,6 +100,31 @@ public class AgentApiClient
         return consents;
     }
 
+    public async Task<bool> RevokeConsentAsync(Guid id, CancellationToken ct = default)
+    {
+        await EnsureTokenAsync(ct);
+        using var req = new HttpRequestMessage(HttpMethod.Post, $"/v1/consents/{id}/revoke");
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _cachedToken!.access_token);
+        var res = await _http.SendAsync(req, ct);
+        if (res.IsSuccessStatusCode) return true;
+        var body = await res.Content.ReadAsStringAsync(ct);
+        throw new HttpRequestException($"Revoke failed: {(int)res.StatusCode} {body}");
+    }
+
+    public async Task<RenewResult?> RenewConsentAsync(Guid id, CancellationToken ct = default)
+    {
+        await EnsureTokenAsync(ct);
+        using var req = new HttpRequestMessage(HttpMethod.Post, $"/v1/consents/{id}/renew");
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _cachedToken!.access_token);
+        var res = await _http.SendAsync(req, ct);
+        if (res.StatusCode == System.Net.HttpStatusCode.BadRequest) return null;
+        res.EnsureSuccessStatusCode();
+        var json = await res.Content.ReadAsStringAsync(ct);
+        return JsonSerializer.Deserialize<RenewResult>(json, JsonOpts);
+    }
+
+    public sealed record RenewResult(string token, Guid token_id, DateTime issued_at, DateTime expires_at, string kid, string alg);
+
     public sealed record ConsentView(
         Guid Id,
         string AgentTenantId,

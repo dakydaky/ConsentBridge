@@ -1,0 +1,32 @@
+@page
+@model MockAgent.ConsoleApp.Pages.Frontpage.IndexModel
+@{
+    ViewData["Title"] = "Apply with ACME Agent";
+}
+
+<h2>Apply with ACME Agent</h2>
+<p class="text-muted">Demo frontpage for candidates. Enter your email and the job, then we’ll request your consent.</p>
+
+<form method="post">
+    <div class="mb-3">
+        <label class="form-label">Your Email</label>
+        <input class="form-control" asp-for="Email" />
+        <span class="text-danger" asp-validation-for="Email"></span>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Job Reference</label>
+        <input class="form-control" asp-for="JobRef" />
+    </div>
+    <button type="submit" class="btn btn-primary">Continue</button>
+    <a class="btn btn-secondary" asp-page="/Index">Agent Dashboard</a>
+  </form>
+
+@if (!string.IsNullOrEmpty(Model.ConsentLink))
+{
+    <div class="alert alert-info mt-4">
+        <div><strong>Next step:</strong> We’ve created a consent request. Open this link to verify your email and approve:</div>
+        <div><code>@Model.ConsentLink</code></div>
+        <div class="form-text">In the real system, you’d receive this by email with a one-time code.</div>
+    </div>
+}
+
