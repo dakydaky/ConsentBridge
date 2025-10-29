@@ -118,12 +118,20 @@ if (app.Environment.IsDevelopment())
     app.MapPost("/debug/tenants/{slug}/rotate-consent-key", async (
         string slug,
         IConsentKeyRotator rotator,
+        IAuditEventSink audit,
         ILogger<Program> logger,
         CancellationToken cancellationToken) =>
     {
         try
         {
             var key = await rotator.RotateAsync(slug, cancellationToken);
+            await audit.EmitAsync(new AuditEventDescriptor(
+                Category: "keys",
+                Action: "rotation",
+                EntityType: nameof(TenantKey),
+                EntityId: key.KeyId,
+                Tenant: slug,
+                CreatedAt: DateTime.UtcNow));
             return Results.Ok(new
             {
                 tenant = slug,
@@ -592,6 +600,13 @@ app.MapPost("/v1/applications", async (
         if (envelope?.Receipt is null || string.IsNullOrWhiteSpace(envelope.ReceiptSignature))
         {
             logger.LogWarning("Board receipt missing payload or signature for application {ApplicationId}", appRec.Id);
+            await audit.EmitAsync(new AuditEventDescriptor(
+                Category: "application",
+                Action: "receipt_missing",
+                EntityType: nameof(Application),
+                EntityId: appRec.Id.ToString(),
+                Tenant: appRec.AgentTenantId,
+                CreatedAt: DateTime.UtcNow));
         }
         else
         {
@@ -603,15 +618,43 @@ app.MapPost("/v1/applications", async (
                 appRec.ReceiptSignature = envelope.ReceiptSignature;
                 appRec.ReceiptHash = Convert.ToHexString(SHA256.HashData(receiptBytes));
                 await db.SaveChangesAsync();
+                await audit.EmitAsync(new AuditEventDescriptor(
+                    Category: "application",
+                    Action: "accepted",
+                    EntityType: nameof(Application),
+                    EntityId: appRec.Id.ToString(),
+                    Tenant: appRec.AgentTenantId,
+                    CreatedAt: DateTime.UtcNow));
+                await audit.EmitAsync(new AuditEventDescriptor(
+                    Category: "receipt",
+                    Action: "verified",
+                    EntityType: nameof(Application),
+                    EntityId: appRec.Id.ToString(),
+                    Tenant: appRec.AgentTenantId,
+                    CreatedAt: DateTime.UtcNow));
                 return Results.Accepted($"/v1/applications/{appRec.Id}", new { id = appRec.Id, status = appRec.Status });
             }
 
             logger.LogWarning("Receipt signature validation failed for application {ApplicationId}", appRec.Id);
+            await audit.EmitAsync(new AuditEventDescriptor(
+                Category: "receipt",
+                Action: "verification_failed",
+                EntityType: nameof(Application),
+                EntityId: appRec.Id.ToString(),
+                Tenant: appRec.AgentTenantId,
+                CreatedAt: DateTime.UtcNow));
         }
     }
 
     appRec.Status = ApplicationStatus.Failed;
     await db.SaveChangesAsync();
+    await audit.EmitAsync(new AuditEventDescriptor(
+        Category: "application",
+        Action: "failed",
+        EntityType: nameof(Application),
+        EntityId: appRec.Id.ToString(),
+        Tenant: appRec.AgentTenantId,
+        CreatedAt: DateTime.UtcNow));
     return Results.StatusCode(502);
 }).RequireAuthorization("apply.submit")
   .WithTags("Applications")
@@ -634,7 +677,7 @@ app.MapGet("/v1/applications/{id:guid}", async Task<Results<NotFound, Ok<Applica
       return op;
   });
 
-app.MapPost("/v1/consents/{id:guid}/revoke", async (Guid id, GatewayDbContext db) =>
+app.MapPost("/v1/consents/{id:guid}/revoke", async (Guid id, GatewayDbContext db, IAuditEventSink audit) =>
 {
     var consent = await db.Consents.FindAsync(id);
     if (consent is null)
@@ -645,6 +688,13 @@ app.MapPost("/v1/consents/{id:guid}/revoke", async (Guid id, GatewayDbContext db
     consent.Status = ConsentStatus.Revoked;
     consent.RevokedAt = DateTime.UtcNow;
     await db.SaveChangesAsync();
+    await audit.EmitAsync(new AuditEventDescriptor(
+        Category: "consent",
+        Action: "revoked",
+        EntityType: nameof(Consent),
+        EntityId: consent.Id.ToString(),
+        Tenant: consent.AgentTenantId,
+        CreatedAt: DateTime.UtcNow));
     return Results.NoContent();
 });
 
