@@ -4,7 +4,7 @@ up:
 	docker compose up --build -d
 
 logs:
-	docker compose logs -f gateway mockboard postgres
+	docker compose logs -f gateway mockboard agentconsole postgres
 
 down:
 	docker compose down -v

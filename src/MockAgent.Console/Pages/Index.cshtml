@@ -1,0 +1,50 @@
+@page
+@model MockAgent.ConsoleApp.Pages.IndexModel
+@{
+    ViewData["Title"] = "Agent Dashboard";
+}
+
+<h2>Agent Dashboard</h2>
+
+<div class="mb-3">
+    <a class="btn btn-primary" asp-page="/Consents/New">Request Consent</a>
+    <a class="btn btn-success" asp-page="/Applications/New">Submit Application</a>
+    <a class="btn btn-outline-secondary" href="/">Refresh</a>
+  </div>
+
+<div class="row">
+    <div class="col-md-6">
+        <h4>Recent Consents</h4>
+        <table class="table table-sm">
+            <thead><tr><th>Candidate</th><th>Request ID</th><th>When</th></tr></thead>
+            <tbody>
+            @foreach (var c in Model.Consents)
+            {
+                <tr>
+                    <td>@c.CandidateEmail</td>
+                    <td><code>@c.RequestId</code></td>
+                    <td>@c.CreatedAt.LocalDateTime</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    <div class="col-md-6">
+        <h4>Recent Applications</h4>
+        <table class="table table-sm">
+            <thead><tr><th>Candidate</th><th>Job</th><th>Result</th><th>When</th></tr></thead>
+            <tbody>
+            @foreach (var a in Model.Applications)
+            {
+                <tr>
+                    <td>@a.CandidateEmail</td>
+                    <td>@a.JobRef</td>
+                    <td><code>@a.ResponseSnippet</code></td>
+                    <td>@a.CreatedAt.LocalDateTime</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+  </div>
+

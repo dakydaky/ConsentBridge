@@ -1,0 +1,39 @@
+@page
+@model MockAgent.ConsoleApp.Pages.Applications.NewModel
+@{
+    ViewData["Title"] = "Submit Application";
+}
+
+<h2>Submit Application</h2>
+
+<form method="post">
+    <div class="mb-3">
+        <label class="form-label">Candidate Email</label>
+        <input class="form-control" asp-for="CandidateEmail" />
+        <span class="text-danger" asp-validation-for="CandidateEmail"></span>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Job Reference</label>
+        <input class="form-control" asp-for="JobRef" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Consent Token (paste from candidate approval)</label>
+        <textarea class="form-control" asp-for="ConsentToken" rows="3"></textarea>
+        <span class="text-muted">Paste the JWT shown on the Consent success screen.</span>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Cover Letter</label>
+        <textarea class="form-control" asp-for="CoverLetter" rows="4"></textarea>
+    </div>
+    <button type="submit" class="btn btn-success">Submit</button>
+    <a class="btn btn-secondary" asp-page="/Index">Cancel</a>
+  </form>
+
+@if (!string.IsNullOrEmpty(Model.ResultSnippet))
+{
+    <div class="alert alert-info mt-4">
+        <div><strong>Submitted</strong></div>
+        <code>@Model.ResultSnippet</code>
+    </div>
+}
+

@@ -1,0 +1,31 @@
+@page
+@model MockAgent.ConsoleApp.Pages.Consents.NewModel
+@{
+    ViewData["Title"] = "Request Consent";
+}
+
+<h2>Request Consent</h2>
+
+<form method="post">
+    <div class="mb-3">
+        <label class="form-label">Candidate Email</label>
+        <input class="form-control" asp-for="CandidateEmail" />
+        <span class="text-danger" asp-validation-for="CandidateEmail"></span>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Board Tenant</label>
+        <input class="form-control" asp-for="BoardTenantId" />
+    </div>
+    <button type="submit" class="btn btn-primary">Start Request</button>
+    <a class="btn btn-secondary" asp-page="/Index">Cancel</a>
+</form>
+
+@if (!string.IsNullOrEmpty(Model.RequestId))
+{
+    <div class="alert alert-success mt-4">
+        <div><strong>Consent Request Created</strong></div>
+        <div>Request ID: <code>@Model.RequestId</code></div>
+        <div>Send the candidate this link: <code>/consent/@Model.RequestId</code> (on the Gateway)</div>
+    </div>
+}
+
