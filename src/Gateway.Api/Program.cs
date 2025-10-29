@@ -363,6 +363,8 @@ app.MapPost("/v1/applications", async (
     IHttpClientFactory httpFactory,
     IJwsVerifier verifier,
     IOptions<ConsentTokenOptions> consentTokenOptions,
+    IOptions<ConsentLifecycleOptions> lifecycleOptions,
+    IAuditEventSink audit,
     ILogger<Program> logger) =>
 {
     if (payload is null)
@@ -393,9 +395,29 @@ app.MapPost("/v1/applications", async (
 
         consent = await db.Consents.Include(c => c.Candidate)
             .FirstOrDefaultAsync(c => c.TokenId == tokenId);
-        if (consent is null || consent.Status != ConsentStatus.Active || consent.ExpiresAt <= DateTime.UtcNow || consent.TokenExpiresAt <= DateTime.UtcNow)
+        if (consent is null || consent.Status != ConsentStatus.Active || consent.ExpiresAt <= DateTime.UtcNow)
         {
             return Results.Forbid();
+        }
+
+        var nowC = DateTime.UtcNow;
+        var withinGraceC = nowC <= consent.TokenExpiresAt.AddDays(Math.Max(0, lifecycleOptions.Value.ExpiryGraceDays));
+        if (consent.TokenExpiresAt <= nowC && !withinGraceC)
+        {
+            return Results.Forbid();
+        }
+        if (consent.TokenExpiresAt <= nowC && withinGraceC)
+        {
+            logger.LogInformation("Accepting consent token within grace window for consent {ConsentId}", consent.Id);
+            await audit.EmitAsync(new AuditEventDescriptor(
+                Category: "application",
+                Action: "token_grace_accept",
+                EntityType: nameof(Application),
+                EntityId: "pending",
+                Tenant: consent.AgentTenantId,
+                CreatedAt: DateTime.UtcNow,
+                Jti: consent.TokenId.ToString()));
+            GatewayMetrics.AppTokenGraceAccepted.Add(1, new KeyValuePair<string, object?>("tenant", consent.AgentTenantId));
         }
     }
     else
@@ -419,7 +441,7 @@ app.MapPost("/v1/applications", async (
 
         consent = await db.Consents.Include(c => c.Candidate)
             .FirstOrDefaultAsync(c => c.TokenId == tokenId);
-        if (consent is null || consent.Status != ConsentStatus.Active || consent.ExpiresAt <= DateTime.UtcNow || consent.TokenExpiresAt <= DateTime.UtcNow)
+        if (consent is null || consent.Status != ConsentStatus.Active || consent.ExpiresAt <= DateTime.UtcNow)
         {
             return Results.Forbid();
         }
@@ -449,7 +471,7 @@ app.MapPost("/v1/applications", async (
             ValidIssuer = consentTokenOptions.Value.Issuer,
             ValidateAudience = true,
             ValidAudience = consent.BoardTenantId,
-            ValidateLifetime = true,
+            ValidateLifetime = false, // we will enforce lifetime + grace manually
             RequireExpirationTime = true,
             RequireSignedTokens = true,
             ValidateIssuerSigningKey = true,
@@ -472,6 +494,38 @@ app.MapPost("/v1/applications", async (
         {
             logger.LogWarning("Consent token claims mismatch for consent {ConsentId}", consent.Id);
             return Results.Forbid();
+        }
+
+        // Enforce token lifetime with grace window
+        var now = DateTime.UtcNow;
+        var tokenExp = jwtToken.ValidTo.ToUniversalTime();
+        var withinGrace = now <= tokenExp.AddDays(Math.Max(0, lifecycleOptions.Value.ExpiryGraceDays));
+        if (tokenExp <= now && !withinGrace)
+        {
+            logger.LogWarning("Consent token expired beyond grace for consent {ConsentId}", consent.Id);
+            await audit.EmitAsync(new AuditEventDescriptor(
+                Category: "application",
+                Action: "token_grace_reject",
+                EntityType: nameof(Application),
+                EntityId: "pending",
+                Tenant: consent.AgentTenantId,
+                CreatedAt: DateTime.UtcNow,
+                Jti: consent.TokenId.ToString()));
+            GatewayMetrics.AppTokenGraceRejected.Add(1, new KeyValuePair<string, object?>("tenant", consent.AgentTenantId));
+            return Results.Forbid();
+        }
+        if (tokenExp <= now && withinGrace)
+        {
+            logger.LogInformation("Accepting consent token within grace window for consent {ConsentId}", consent.Id);
+            await audit.EmitAsync(new AuditEventDescriptor(
+                Category: "application",
+                Action: "token_grace_accept",
+                EntityType: nameof(Application),
+                EntityId: "pending",
+                Tenant: consent.AgentTenantId,
+                CreatedAt: DateTime.UtcNow,
+                Jti: consent.TokenId.ToString()));
+            GatewayMetrics.AppTokenGraceAccepted.Add(1, new KeyValuePair<string, object?>("tenant", consent.AgentTenantId));
         }
 
         if (consent.TokenHash is not null)
@@ -593,6 +647,49 @@ app.MapPost("/v1/consents/{id:guid}/revoke", async (Guid id, GatewayDbContext db
     await db.SaveChangesAsync();
     return Results.NoContent();
 });
+
+app.MapPost("/v1/consents/{id:guid}/renew", async (
+    ClaimsPrincipal user,
+    Guid id,
+    GatewayDbContext db,
+    IConsentLifecycleService lifecycle) =>
+{
+    var (tenantSlug, tenantType) = AuthHelpers.GetTenantContext(user);
+    if (tenantSlug is null || tenantType != TenantType.Agent)
+    {
+        return Results.Forbid();
+    }
+
+    var consent = await db.Consents.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id);
+    if (consent is null)
+    {
+        return Results.NotFound();
+    }
+
+    if (!string.Equals(consent.AgentTenantId, tenantSlug, StringComparison.Ordinal))
+    {
+        return Results.Forbid();
+    }
+
+    var result = await lifecycle.RenewAsync(id);
+    return result is null
+        ? Results.BadRequest(new { error = "renewal_not_allowed" })
+        : Results.Ok(new
+        {
+            token = result.Token,
+            token_id = result.TokenId,
+            issued_at = result.IssuedAt,
+            expires_at = result.ExpiresAt,
+            kid = result.KeyId,
+            alg = result.Algorithm,
+        });
+}).RequireAuthorization("apply.submit")
+  .WithTags("Consents")
+  .WithOpenApi(op =>
+  {
+      op.Summary = "Renew a consent's token if within policy window";
+      return op;
+  });
 
 app.MapPost("/oauth/token", async (
     HttpRequest request,
