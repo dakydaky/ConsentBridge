@@ -131,6 +131,16 @@ Use Swagger to back up compliance talking points:
 4. **🔄 JWKS rotation rehearsal**
    - Swap the JWKS file for MockBoard, restart gateway, re-run the submission to confirm verification switches to the new key.
 
+### 🔎 Audit Events & Correlation IDs
+
+- Categories/actions recorded in audit logs and tables:
+  - `consent`: `issued`, `denied`, `revoked`
+  - `application`: `created`, `accepted`, `failed`, `receipt_missing`, `token_grace_accept`, `token_grace_reject`
+  - `receipt`: `verified`, `verification_failed`
+  - `keys`: `rotation`
+- Correlation ID:
+  - Send an `X-Correlation-ID` header; it is attached to audit `metadata` (`cid=<your-id>`). If missing, the server `TraceIdentifier` is used.
+
 ---
 
 ## ✅ Quick Reference

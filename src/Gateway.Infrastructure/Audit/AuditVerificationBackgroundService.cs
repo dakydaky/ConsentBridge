@@ -14,6 +14,7 @@ public sealed class AuditVerificationOptions
     public int WindowDays { get; set; } = 1;  // how many days to verify per run
     public int OverlapMinutes { get; set; } = 5; // overlap to bridge gaps
     public string DigestOutputPath { get; set; } = "/app/audit-digests"; // where to write JSON digests
+    public string? DigestArchivePath { get; set; } // optional off-cluster/export path
 }
 
 public sealed class AuditVerificationBackgroundService : BackgroundService
@@ -121,7 +122,35 @@ public sealed class AuditVerificationBackgroundService : BackgroundService
         };
 
         var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
+        // Write local digest (overwrite allowed for idempotence)
         await File.WriteAllTextAsync(fullPath, json, cancellationToken);
+
+        // Optional archive to off-cluster/WORM-like path
+        if (!string.IsNullOrWhiteSpace(_options.DigestArchivePath))
+        {
+            var archiveRoot = _options.DigestArchivePath!;
+            if (!Path.IsPathRooted(archiveRoot))
+            {
+                archiveRoot = Path.Combine(_env.ContentRootPath, archiveRoot);
+            }
+            Directory.CreateDirectory(archiveRoot);
+            var archivePath = Path.Combine(archiveRoot, fileName);
+            try
+            {
+                // Create new file (fail if exists), set read-only attribute to emulate WORM
+                await using var fs = new FileStream(archivePath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+                var bytes = System.Text.Encoding.UTF8.GetBytes(json);
+                await fs.WriteAsync(bytes, 0, bytes.Length, cancellationToken);
+                fs.Flush(true);
+                fs.Close();
+                var attr = File.GetAttributes(archivePath);
+                File.SetAttributes(archivePath, attr | FileAttributes.ReadOnly);
+            }
+            catch (IOException)
+            {
+                // Already archived; ignore
+            }
+        }
     }
 
     private static string Sanitize(string value)

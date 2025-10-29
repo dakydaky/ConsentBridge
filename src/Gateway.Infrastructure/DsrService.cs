@@ -81,12 +81,36 @@ public sealed class DsrService : IDsrService
             cr.VerifiedAt,
             cr.DecisionAt)).ToList();
 
+        // Include audit events linked to subject's consents/applications/requests
+        var consentIdsSet = new HashSet<Guid>(consents.Select(c => c.Id));
+        var applicationIdsSet = new HashSet<Guid>(applications.Select(a => a.Id));
+        var requestIdsSet = new HashSet<Guid>(consentRequests.Select(r => r.Id));
+
+        var auditEvents = await _db.AuditEvents.AsNoTracking()
+            .Where(a =>
+                (a.EntityType == nameof(Consent) && consentIdsSet.Contains(Guid.Parse(a.EntityId))) ||
+                (a.EntityType == nameof(Application) && applicationIdsSet.Contains(Guid.Parse(a.EntityId))) ||
+                (a.EntityType == nameof(ConsentRequest) && requestIdsSet.Contains(Guid.Parse(a.EntityId))))
+            .OrderBy(a => a.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        var auditRecords = auditEvents.Select(a => new DsrAuditEventRecord(
+            a.Id,
+            a.Category,
+            a.Action,
+            a.EntityType,
+            a.EntityId,
+            a.CreatedAt,
+            a.Jti,
+            a.Metadata)).ToList();
+
         return new DsrExportResult(
             normalizedEmail,
             candidate.CreatedAt,
             consentRecords,
             applicationRecords,
-            consentRequestRecords);
+            consentRequestRecords,
+            auditRecords);
     }
 
     public async Task<DsrDeleteResult> DeleteAsync(string tenantSlug, TenantType? tenantType, string candidateEmail, CancellationToken cancellationToken = default)

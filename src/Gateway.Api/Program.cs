@@ -692,7 +692,7 @@ app.MapGet("/v1/applications/{id:guid}", async Task<Results<NotFound, Ok<Applica
       return op;
   });
 
-app.MapPost("/v1/consents/{id:guid}/revoke", async (Guid id, GatewayDbContext db, IAuditEventSink audit) =>
+app.MapPost("/v1/consents/{id:guid}/revoke", async (Guid id, GatewayDbContext db, HttpContext http, IAuditEventSink audit) =>
 {
     var consent = await db.Consents.FindAsync(id);
     if (consent is null)
@@ -703,13 +703,15 @@ app.MapPost("/v1/consents/{id:guid}/revoke", async (Guid id, GatewayDbContext db
     consent.Status = ConsentStatus.Revoked;
     consent.RevokedAt = DateTime.UtcNow;
     await db.SaveChangesAsync();
+    var corr = http.Request.Headers.TryGetValue("X-Correlation-ID", out var rcid) ? rcid.ToString() : http.TraceIdentifier;
     await audit.EmitAsync(new AuditEventDescriptor(
         Category: "consent",
         Action: "revoked",
         EntityType: nameof(Consent),
         EntityId: consent.Id.ToString(),
         Tenant: consent.AgentTenantId,
-        CreatedAt: DateTime.UtcNow));
+        CreatedAt: DateTime.UtcNow,
+        Metadata: $"cid={corr}"));
     return Results.NoContent();
 });
 
