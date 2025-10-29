@@ -11,5 +11,8 @@ public static class GatewayMetrics
 
     public static readonly Counter<long> AppTokenGraceAccepted = Meter.CreateCounter<long>("applications.token_grace.accepted");
     public static readonly Counter<long> AppTokenGraceRejected = Meter.CreateCounter<long>("applications.token_grace.rejected");
+
+    public static readonly Counter<long> AuditVerificationSuccess = Meter.CreateCounter<long>("audit.verification.success");
+    public static readonly Counter<long> AuditVerificationFailed = Meter.CreateCounter<long>("audit.verification.failed");
 }
 

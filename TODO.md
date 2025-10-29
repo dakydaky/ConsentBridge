@@ -19,7 +19,8 @@ _Last refreshed: 2025-10-28_
 - ✅ **Retention sweeps** — automated removal of aged consent requests and receipt payloads with configurable windows.
 - ✅ **DSR endpoints** — export/delete APIs online; SLA tracking remains to be wired up.
 - ⏳ **Retention SLA instrumentation** — metrics and alerts to prove sweeps run within policy windows.
-- 🚧 **Immutable audit trail tables** — schema in place; lifecycle + token‑grace events emitted; verification service + admin endpoints added. Next: background verifier, daily digest export, broaden emission (revocation, submission, receipt).
+- 🚧 **Immutable audit trail tables** — schema in place; lifecycle + token‑grace events emitted; verification service + admin endpoints; background verifier + daily digest export.
+  - ⏳ Next: broaden emission (revocation, submission success/failure, receipt verification, key rotation), DB role hardening, WORM digest storage.
 - ⏳ **PII field-level encryption strategy** — implement `candidate.pii_enc` handling aligned to spec guidance.
 - ⏳ **DSR export packaging** — deliver signed archive responses and documented operator flow.
 

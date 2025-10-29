@@ -43,6 +43,8 @@ public static class InfrastructureServices
         services.AddScoped<IConsentLifecycleService, ConsentLifecycleService>();
         services.AddScoped<IAuditEventSink, PersistentAuditEventSink>();
         services.AddScoped<IAuditVerifier, AuditVerifierService>();
+        services.Configure<AuditVerificationOptions>(configuration.GetSection("AuditVerification"));
+        services.AddHostedService<AuditVerificationBackgroundService>();
         services.Configure<RetentionOptions>(configuration.GetSection("Retention"));
         services.Configure<ConsentTokenOptions>(configuration.GetSection("ConsentTokens"));
         services.AddScoped<DataRetentionExecutor>();
