@@ -32,6 +32,8 @@ services:
         condition: service_healthy
       mockboard:
         condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
     environment:
       ConnectionStrings__Default: Host=postgres;Port=5432;Database=gateway;Username=gateway;Password=devpass
       ASPNETCORE_ENVIRONMENT: Development
@@ -39,6 +41,20 @@ services:
     ports: ["8080:8080"]
     volumes:
       - gateway_dataprotection:/app/dataprotection
+
+  migrator:
+    build:
+      context: .
+      dockerfile: src/Gateway.Api/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__Default: Host=postgres;Port=5432;Database=gateway;Username=gateway;Password=devpass
+      ASPNETCORE_ENVIRONMENT: Development
+      MIGRATE_ONLY: "true"
+    # Run once and exit successfully
+    restart: "no"
 
   agentconsole:
     build:

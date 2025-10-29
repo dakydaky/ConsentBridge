@@ -110,6 +110,14 @@ using (var scope = app.Services.CreateScope())
 }
 await DemoTenantSeeder.SeedAsync(app.Services, builder.Configuration);
 
+// Optional one-shot migrator mode for docker-compose init
+var migrateOnly = Environment.GetEnvironmentVariable("MIGRATE_ONLY");
+if (string.Equals(migrateOnly, "true", StringComparison.OrdinalIgnoreCase))
+{
+    Console.WriteLine("MIGRATE_ONLY=true: migrations and seed completed; exiting.");
+    return;
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
