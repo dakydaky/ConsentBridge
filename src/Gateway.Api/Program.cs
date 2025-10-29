@@ -397,6 +397,51 @@ app.MapGet("/v1/consent-requests", async (
     return Results.Ok(rows);
 }).RequireAuthorization("apply.submit");
 
+app.MapPost("/v1/consent-requests/{id:guid}/cancel", async (
+    ClaimsPrincipal user,
+    Guid id,
+    GatewayDbContext db,
+    IAuditEventSink audit,
+    HttpContext http) =>
+{
+    var (tenantSlug, tenantType) = AuthHelpers.GetTenantContext(user);
+    if (tenantSlug is null || tenantType != TenantType.Agent)
+    {
+        return Results.Forbid();
+    }
+
+    var request = await db.ConsentRequests.FirstOrDefaultAsync(r => r.Id == id);
+    if (request is null)
+    {
+        return Results.NotFound();
+    }
+    if (!string.Equals(request.AgentTenantId, tenantSlug, StringComparison.Ordinal))
+    {
+        return Results.Forbid();
+    }
+    if (request.Status is ConsentRequestStatus.Approved or ConsentRequestStatus.Denied or ConsentRequestStatus.Expired)
+    {
+        return Results.BadRequest(new { error = "cannot_cancel" });
+    }
+
+    request.Status = ConsentRequestStatus.Denied; // interpret as agent-cancelled in demo
+    request.DecisionAt = DateTime.UtcNow;
+    await db.SaveChangesAsync();
+
+    var corr = http.Request.Headers.TryGetValue("X-Correlation-ID", out var rcid) ? rcid.ToString() : http.TraceIdentifier;
+    await audit.EmitAsync(new AuditEventDescriptor(
+        Category: "consent_request",
+        Action: "cancelled",
+        EntityType: nameof(ConsentRequest),
+        EntityId: request.Id.ToString(),
+        Tenant: request.AgentTenantId,
+        CreatedAt: DateTime.UtcNow,
+        Metadata: $"cid={corr}"));
+
+    return Results.NoContent();
+}).RequireAuthorization("apply.submit")
+  .WithTags("Consents");
+
 app.MapGet("/v1/consents", async (
     ClaimsPrincipal user,
     [FromQuery] int? take,

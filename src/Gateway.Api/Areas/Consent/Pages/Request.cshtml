@@ -35,8 +35,31 @@
         </div>
         <div class="btn-row">
             <button type="submit" class="primary">Verify code</button>
+            <button id="btn-resend" type="submit" formaction="?handler=Resend" class="secondary" @(Model.ResendWaitSeconds > 0 ? "disabled" : string.Empty) data-wait="@Model.ResendWaitSeconds">Resend code</button>
         </div>
     </form>
+
+    <script>
+      (function(){
+        var btn = document.getElementById('btn-resend');
+        if(!btn) return;
+        var wait = parseInt(btn.getAttribute('data-wait')||'0');
+        if (wait > 0) {
+          var baseLabel = 'Resend code';
+          btn.textContent = baseLabel + ' ('+wait+'s)';
+          var iv = setInterval(function(){
+            wait -= 1;
+            if (wait <= 0) {
+              clearInterval(iv);
+              btn.disabled = false;
+              btn.textContent = baseLabel;
+            } else {
+              btn.textContent = baseLabel + ' ('+wait+'s)';
+            }
+          }, 1000);
+        }
+      })();
+    </script>
 
     <h2>Requested scopes</h2>
     <ul class="scope-list">

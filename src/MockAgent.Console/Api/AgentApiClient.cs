@@ -170,4 +170,13 @@ public class AgentApiClient
         Guid? consent_id,
         string link
     );
+
+    public async Task CancelConsentRequestAsync(Guid id, CancellationToken ct = default)
+    {
+        await EnsureTokenAsync(ct);
+        using var req = new HttpRequestMessage(HttpMethod.Post, $"/v1/consent-requests/{id}/cancel");
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _cachedToken!.access_token);
+        var res = await _http.SendAsync(req, ct);
+        res.EnsureSuccessStatusCode();
+    }
 }

@@ -83,4 +83,10 @@ public class IndexModel : PageModel
         try { await _api.RenewConsentAsync(id); } catch (Exception ex) { _logger.LogWarning(ex, "Renew failed"); }
         return RedirectToPage();
     }
+
+    public async Task<IActionResult> OnPostCancelPendingAsync(Guid id)
+    {
+        try { await _api.CancelConsentRequestAsync(id); } catch (Exception ex) { _logger.LogWarning(ex, "Cancel pending failed"); }
+        return RedirectToPage();
+    }
 }

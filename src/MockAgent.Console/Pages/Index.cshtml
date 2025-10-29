@@ -62,7 +62,7 @@
                     <td>@c.CandidateEmail</td>
                     <td><code>@c.Id</code></td>
                     <td>@c.CreatedAt.ToLocalTime()</td>
-                    <td><a class="btn btn-sm btn-outline-secondary" href="@Model.PublicBaseUrl@c.link" target="_blank">Open</a></td>
+                    <td><a class="btn btn-sm btn-outline-secondary" href="@Model.PublicBaseUrl@c.link" target="_blank">Open</a> <form method="post" asp-page-handler="CancelPending" asp-route-id="@c.Id" class="d-inline"><button class="btn btn-sm btn-outline-danger ms-1">Cancel</button></form></td>
                 </tr>
             }
             </tbody>
@@ -109,4 +109,6 @@
         </table>
     </div>
   </div>
+
+
 
