@@ -29,6 +29,17 @@ public static class InfrastructureServices
             (JwtConsentTokenFactory)sp.GetRequiredService<IConsentTokenFactory>());
         services.AddScoped<IDsrService, DsrService>();
         services.Configure<ConsentLifecycleOptions>(configuration.GetSection("ConsentLifecycle"));
+        services.PostConfigure<ConsentLifecycleOptions>(options =>
+        {
+            if (options.RenewalLeadDays < 0)
+            {
+                throw new InvalidOperationException("ConsentLifecycle:RenewalLeadDays must be >= 0.");
+            }
+            if (options.ExpiryGraceDays < 0)
+            {
+                throw new InvalidOperationException("ConsentLifecycle:ExpiryGraceDays must be >= 0.");
+            }
+        });
         services.AddScoped<IConsentLifecycleService, ConsentLifecycleService>();
         services.AddSingleton<IAuditEventSink, DefaultAuditEventSink>();
         services.Configure<RetentionOptions>(configuration.GetSection("Retention"));
