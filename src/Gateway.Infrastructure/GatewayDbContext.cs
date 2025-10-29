@@ -100,6 +100,11 @@ public class GatewayDbContext : DbContext
         b.Entity<AuditEventHash>()
             .HasKey(h => h.EventId);
         b.Entity<AuditEventHash>()
+            .HasOne<AuditEvent>()
+            .WithOne()
+            .HasForeignKey<AuditEventHash>(h => h.EventId)
+            .OnDelete(DeleteBehavior.Cascade);
+        b.Entity<AuditEventHash>()
             .Property(h => h.PreviousHash).HasMaxLength(128);
         b.Entity<AuditEventHash>()
             .Property(h => h.CurrentHash).HasMaxLength(128);

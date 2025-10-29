@@ -3,6 +3,10 @@
 up:
 	docker compose up --build -d
 
+up-nc:
+	docker compose build --no-cache
+	docker compose up -d
+
 logs:
 	docker compose logs -f gateway mockboard agentconsole postgres
 
@@ -39,12 +43,25 @@ volumes-prune:
 docker-nuke:
 	docker system prune -a --volumes -f
 
+.PHONY: migrate-run
+migrate-run:
+	docker compose run --rm migrator
+
 down:
 	docker compose down -v
 
 add-migration:
-	dotnet tool restore || true
-	dotnet ef migrations add Initial --project src/Gateway.Infrastructure --startup-project src/Gateway.Api
+	@echo Usage: make add-migration NAME=DescriptiveName  or  make add-migration-DescriptiveName
+	@exit 1
+
+# Alternate syntax without NAME var, e.g.:
+#   make add-migration-AddAuditTables
+add-migration-%:
+	dotnet ef migrations add $* --project src/Gateway.Infrastructure --startup-project src/Gateway.Api
 
 migrate:
 	dotnet ef database update --project src/Gateway.Infrastructure --startup-project src/Gateway.Api
+
+.PHONY: migrations-list
+migrations-list:
+	dotnet ef migrations list --project src/Gateway.Infrastructure --startup-project src/Gateway.Api

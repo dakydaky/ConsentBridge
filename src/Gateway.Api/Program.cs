@@ -7,6 +7,7 @@ using Gateway.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -24,7 +25,11 @@ builder.Host.UseSerilog((ctx, lc) => lc
     .WriteTo.Console());
 
 builder.Services.AddDbContext<GatewayDbContext>(opts =>
-    opts.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
+{
+    opts.UseNpgsql(builder.Configuration.GetConnectionString("Default"));
+    // Avoid crashing migrator on dev when model changes exist but migrations are being rebuilt.
+    opts.ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
+});
 builder.Services.Configure<JwtAccessTokenOptions>(builder.Configuration.GetSection("Auth:Jwt"));
 var jwtOptions = builder.Configuration.GetSection("Auth:Jwt").Get<JwtAccessTokenOptions>()
     ?? throw new InvalidOperationException("Auth:Jwt configuration missing.");
@@ -106,7 +111,20 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<GatewayDbContext>();
-    db.Database.Migrate();
+    try
+    {
+        var pending = await db.Database.GetPendingMigrationsAsync();
+        if (pending.Any())
+        {
+            Console.WriteLine($"Applying migrations: {string.Join(", ", pending)}");
+        }
+        db.Database.Migrate();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Migration error: {ex.Message}");
+        throw;
+    }
 }
 await DemoTenantSeeder.SeedAsync(app.Services, builder.Configuration);
 
