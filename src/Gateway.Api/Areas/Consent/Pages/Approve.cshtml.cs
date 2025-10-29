@@ -70,13 +70,15 @@ public class ApproveModel : PageModel
             RequestEntity.Status = ConsentRequestStatus.Denied;
             RequestEntity.DecisionAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
+            var corr = HttpContext.Request.Headers.TryGetValue("X-Correlation-ID", out var cid) ? cid.ToString() : HttpContext.TraceIdentifier;
             await _audit.EmitAsync(new AuditEventDescriptor(
                 Category: "consent",
                 Action: "denied",
                 EntityType: nameof(ConsentRequest),
                 EntityId: RequestEntity.Id.ToString(),
                 Tenant: RequestEntity.AgentTenantId,
-                CreatedAt: DateTime.UtcNow));
+                CreatedAt: DateTime.UtcNow,
+                Metadata: $"cid={corr}"));
             TempData["ConsentStatus"] = "denied";
             return RedirectToPage("Complete", new { id });
         }
@@ -129,6 +131,7 @@ public class ApproveModel : PageModel
 
         _logger.LogInformation("Consent request {RequestId} approved. Consent {ConsentId}.", RequestEntity.Id, consent.Id);
 
+        var corr2 = HttpContext.Request.Headers.TryGetValue("X-Correlation-ID", out var cid2) ? cid2.ToString() : HttpContext.TraceIdentifier;
         await _audit.EmitAsync(new AuditEventDescriptor(
             Category: "consent",
             Action: "issued",
@@ -136,7 +139,8 @@ public class ApproveModel : PageModel
             EntityId: consent.Id.ToString(),
             Tenant: consent.AgentTenantId,
             CreatedAt: DateTime.UtcNow,
-            Jti: consent.TokenId.ToString()));
+            Jti: consent.TokenId.ToString(),
+            Metadata: $"cid={corr2}"));
 
         TempData["ConsentStatus"] = "approved";
         TempData["ConsentToken"] = issued.Token;

@@ -372,6 +372,7 @@ app.MapPost("/v1/applications", async (
     IJwsVerifier verifier,
     IOptions<ConsentTokenOptions> consentTokenOptions,
     IOptions<ConsentLifecycleOptions> lifecycleOptions,
+    HttpContext http,
     IAuditEventSink audit,
     ILogger<Program> logger) =>
 {
@@ -574,6 +575,15 @@ app.MapPost("/v1/applications", async (
     };
     db.Applications.Add(appRec);
     await db.SaveChangesAsync();
+    var corr = http.Request.Headers.TryGetValue("X-Correlation-ID", out var cid) ? cid.ToString() : http.TraceIdentifier;
+    await audit.EmitAsync(new AuditEventDescriptor(
+        Category: "application",
+        Action: "created",
+        EntityType: nameof(Application),
+        EntityId: appRec.Id.ToString(),
+        Tenant: appRec.AgentTenantId,
+        CreatedAt: DateTime.UtcNow,
+        Metadata: $"cid={corr}"));
 
     var client = httpFactory.CreateClient("mockboard");
     var resp = await client.PostAsJsonAsync("/v1/mock/applications", new
@@ -606,7 +616,8 @@ app.MapPost("/v1/applications", async (
                 EntityType: nameof(Application),
                 EntityId: appRec.Id.ToString(),
                 Tenant: appRec.AgentTenantId,
-                CreatedAt: DateTime.UtcNow));
+                CreatedAt: DateTime.UtcNow,
+                Metadata: $"cid={corr}"));
         }
         else
         {
@@ -624,14 +635,16 @@ app.MapPost("/v1/applications", async (
                     EntityType: nameof(Application),
                     EntityId: appRec.Id.ToString(),
                     Tenant: appRec.AgentTenantId,
-                    CreatedAt: DateTime.UtcNow));
+                    CreatedAt: DateTime.UtcNow,
+                    Metadata: $"cid={corr}"));
                 await audit.EmitAsync(new AuditEventDescriptor(
                     Category: "receipt",
                     Action: "verified",
                     EntityType: nameof(Application),
                     EntityId: appRec.Id.ToString(),
                     Tenant: appRec.AgentTenantId,
-                    CreatedAt: DateTime.UtcNow));
+                    CreatedAt: DateTime.UtcNow,
+                    Metadata: $"cid={corr}"));
                 return Results.Accepted($"/v1/applications/{appRec.Id}", new { id = appRec.Id, status = appRec.Status });
             }
 
@@ -642,7 +655,8 @@ app.MapPost("/v1/applications", async (
                 EntityType: nameof(Application),
                 EntityId: appRec.Id.ToString(),
                 Tenant: appRec.AgentTenantId,
-                CreatedAt: DateTime.UtcNow));
+                CreatedAt: DateTime.UtcNow,
+                Metadata: $"cid={corr}"));
         }
     }
 
@@ -654,7 +668,8 @@ app.MapPost("/v1/applications", async (
         EntityType: nameof(Application),
         EntityId: appRec.Id.ToString(),
         Tenant: appRec.AgentTenantId,
-        CreatedAt: DateTime.UtcNow));
+        CreatedAt: DateTime.UtcNow,
+        Metadata: $"cid={corr}"));
     return Results.StatusCode(502);
 }).RequireAuthorization("apply.submit")
   .WithTags("Applications")

@@ -3,6 +3,8 @@ using Gateway.Domain;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 
 namespace Gateway.Infrastructure;
 
@@ -24,7 +26,15 @@ public static class InfrastructureServices
         });
         services.AddScoped<IJwsVerifier, JwksJwsVerifier>();
         services.AddSingleton<IClientSecretHasher, DefaultClientSecretHasher>();
-        services.AddScoped<IConsentTokenFactory, JwtConsentTokenFactory>();
+        services.AddScoped<IConsentTokenFactory>(sp =>
+        {
+            var db = sp.GetRequiredService<GatewayDbContext>();
+            var dp = sp.GetRequiredService<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>();
+            var opts = sp.GetRequiredService<IOptions<ConsentTokenOptions>>();
+            var logger = sp.GetRequiredService<ILogger<JwtConsentTokenFactory>>();
+            var audit = sp.GetService<IAuditEventSink>();
+            return new JwtConsentTokenFactory(db, dp, opts, logger, audit);
+        });
         services.AddScoped<IConsentKeyRotator>(sp =>
             (JwtConsentTokenFactory)sp.GetRequiredService<IConsentTokenFactory>());
         services.AddScoped<IDsrService, DsrService>();
