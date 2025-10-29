@@ -34,7 +34,7 @@ public class IndexModel : PageModel
         LoggedInEmail = HttpContext.Session.GetString("CandidateEmail");
         if (!string.IsNullOrWhiteSpace(LoggedInEmail))
         {
-            var pending = await _api.GetConsentRequestsAsync(LoggedInEmail);
+            var pending = await _api.GetConsentRequestsAsync(LoggedInEmail, status: "Pending");
             MyPending = pending.ToList();
             var consents = await _api.GetConsentsAsync();
             MyConsents = consents.Where(c => string.Equals(c.ApprovedByEmail, LoggedInEmail, StringComparison.OrdinalIgnoreCase)).ToList();
@@ -57,6 +57,14 @@ public class IndexModel : PageModel
     public IActionResult OnGetLogout()
     {
         HttpContext.Session.Remove("CandidateEmail");
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostRevokeAsync(Guid id)
+    {
+        var email = HttpContext.Session.GetString("CandidateEmail");
+        if (string.IsNullOrWhiteSpace(email)) return RedirectToPage("/Login");
+        await _api.RevokeConsentAsync(id);
         return RedirectToPage();
     }
 }

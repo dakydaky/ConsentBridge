@@ -41,10 +41,11 @@ public class AgentApiClient
         return doc.RootElement.GetProperty("request_id").GetString() ?? string.Empty;
     }
 
-    public async Task<IReadOnlyList<ConsentRequestView>> GetConsentRequestsAsync(string email, CancellationToken ct = default)
+    public async Task<IReadOnlyList<ConsentRequestView>> GetConsentRequestsAsync(string email, string? status = null, CancellationToken ct = default)
     {
         await EnsureTokenAsync(ct);
-        using var req = new HttpRequestMessage(HttpMethod.Get, $"/v1/consent-requests?email={Uri.EscapeDataString(email)}&take=50");
+        var qs = $"email={Uri.EscapeDataString(email)}&take=50" + (string.IsNullOrWhiteSpace(status) ? string.Empty : $"&status={Uri.EscapeDataString(status)}");
+        using var req = new HttpRequestMessage(HttpMethod.Get, $"/v1/consent-requests?{qs}");
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _cachedToken!.access_token);
         var res = await _http.SendAsync(req, ct);
         res.EnsureSuccessStatusCode();
@@ -143,6 +144,24 @@ public class AgentApiClient
         string? ReceiptSignature,
         string? ReceiptHash
     );
+
+    public async Task<bool> RevokeConsentAsync(Guid id, CancellationToken ct = default)
+    {
+        await EnsureTokenAsync(ct);
+        using var req = new HttpRequestMessage(HttpMethod.Post, $"/v1/consents/{id}/revoke");
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _cachedToken!.access_token);
+        var res = await _http.SendAsync(req, ct);
+        return res.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> RenewConsentAsync(Guid id, CancellationToken ct = default)
+    {
+        await EnsureTokenAsync(ct);
+        using var req = new HttpRequestMessage(HttpMethod.Post, $"/v1/consents/{id}/renew");
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _cachedToken!.access_token);
+        var res = await _http.SendAsync(req, ct);
+        return res.IsSuccessStatusCode;
+    }
 
     private sealed class OAuthToken
     {

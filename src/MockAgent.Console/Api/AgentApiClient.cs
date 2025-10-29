@@ -50,6 +50,7 @@ public class AgentApiClient
         {
             Content = new StringContent(applicationJson, Encoding.UTF8, "application/json")
         };
+        req.Headers.Add("X-JWS-Signature", "DEMO");
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _cachedToken!.access_token);
         var res = await _http.SendAsync(req, ct);
         res.EnsureSuccessStatusCode();

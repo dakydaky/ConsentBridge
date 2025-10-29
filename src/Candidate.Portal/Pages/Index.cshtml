@@ -5,8 +5,9 @@
 }
 
 <div class="text-center mb-4">
-  <h2>ConsentBridge · Candidate Portal</h2>
-  <p class="text-muted">Authorize your agent to apply on your behalf.</p>
+  <h2>AgentX · Candidate Portal</h2>
+  <p class="text-muted">Authorize your agent to apply on your behalf across jobs.</p>
+  <p class="text-muted">You can revoke or renew this consent anytime.</p>
 </div>
 
 @if (!string.IsNullOrEmpty(Model.LoggedInEmail)) {
@@ -18,12 +19,8 @@
 @if (!string.IsNullOrEmpty(Model.LoggedInEmail)) {
   <div class="card mb-3">
     <div class="card-body">
-      <h5 class="card-title">Start consent for a job</h5>
+      <h5 class="card-title">Start consent</h5>
       <form method="post">
-        <div class="mb-3">
-          <label class="form-label">Job Reference</label>
-          <input class="form-control" asp-for="JobRef" />
-        </div>
         <button type="submit" class="btn btn-primary">Create Consent Request</button>
         @if (!string.IsNullOrEmpty(Model.ConsentLink)) {
           <a class="btn btn-outline-secondary ms-2" href="@Model.ConsentLink" target="_blank">Open Consent</a>
@@ -45,7 +42,7 @@
       <h5>Active Consents</h5>
       <ul>
         @foreach (var c in Model.MyConsents) {
-          <li>ctok:@c.TokenId · exp @c.TokenExpiresAt.ToLocalTime()</li>
+          <li>ctok:@c.TokenId · exp @c.TokenExpiresAt.ToLocalTime() · <form method="post" asp-page-handler="Revoke" asp-route-id="@c.Id" class="d-inline"><button class="btn btn-sm btn-outline-danger">Revoke</button></form></li>
         }
       </ul>
     </div>
