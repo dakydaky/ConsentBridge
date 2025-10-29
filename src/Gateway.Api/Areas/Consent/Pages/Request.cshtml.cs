@@ -82,6 +82,13 @@ public class RequestModel : PageModel
         await AssignNamesAsync();
         ResendWaitSeconds = RequestEntity is not null ? GetRemainingCooldown(RequestEntity.Id) : 0;
 
+        if (RequestEntity is null)
+        {
+            InfoMessage = "Consent request not found.";
+            return Page();
+        }
+
+
         if (RequestEntity.ExpiresAt <= DateTime.UtcNow)
         {
             if (RequestEntity.Status != ConsentRequestStatus.Expired)

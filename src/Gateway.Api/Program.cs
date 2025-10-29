@@ -536,7 +536,11 @@ app.MapPost("/v1/applications", async (
         return Results.BadRequest();
     }
 
-    if (string.IsNullOrWhiteSpace(jws) && !env.IsDevelopment()) {
+    Guid tokenId = Guid.Empty;
+    Consent? consent = null;
+
+    if (string.IsNullOrWhiteSpace(jws) && !env.IsDevelopment())
+    {
         return Results.BadRequest(new { error = "missing_signature" });
     }
     if (string.IsNullOrWhiteSpace(payload.ConsentToken)) {
