@@ -13,7 +13,7 @@
       const data = await res.json();
       // Update Pending Requests
       const tbodyP = document.querySelector('#pending tbody');
-      tbodyP.innerHTML = data.pending.map(r => `<tr><td>${r.candidateEmail}</td><td><code>${r.id}</code></td><td>${new Date(r.createdAt).toLocaleString()}</td><td><a class="btn btn-sm btn-outline-secondary" href="${data.gatewayBaseUrl}${r.link}" target="_blank">Open</a></td></tr>`).join('');
+      tbodyP.innerHTML = data.pending.map(r => `<tr><td>${r.candidateEmail}</td><td><code>${r.id}</code></td><td>${new Date(r.createdAt).toLocaleString()}</td><td><a class="btn btn-sm btn-outline-secondary" href="${data.publicBaseUrl}${r.link}" target="_blank">Open</a></td></tr>`).join('');
       // Update Active Consents
       const tbodyC = document.querySelector('#consents tbody');
       tbodyC.innerHTML = data.consents.map(c => `<tr><td>${c.approvedByEmail || '(hidden)'}</td><td>${c.status}</td><td><code>ctok:${c.tokenId}</code></td><td>${new Date(c.tokenExpiresAt).toLocaleString()}</td><td><form method="post" action="?handler=Revoke&id=${c.id}" class="d-inline"><button class="btn btn-sm btn-outline-danger">Revoke</button></form> <form method="post" action="?handler=Renew&id=${c.id}" class="d-inline"><button class="btn btn-sm btn-outline-primary">Renew</button></form></td></tr>`).join('');
@@ -62,7 +62,7 @@
                     <td>@c.CandidateEmail</td>
                     <td><code>@c.Id</code></td>
                     <td>@c.CreatedAt.ToLocalTime()</td>
-                    <td><a class="btn btn-sm btn-outline-secondary" href="@Model.GatewayBaseUrl@c.link" target="_blank">Open</a></td>
+                    <td><a class="btn btn-sm btn-outline-secondary" href="@Model.PublicBaseUrl@c.link" target="_blank">Open</a></td>
                 </tr>
             }
             </tbody>
@@ -109,3 +109,4 @@
         </table>
     </div>
   </div>
+

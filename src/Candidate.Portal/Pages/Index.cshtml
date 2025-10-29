@@ -37,7 +37,7 @@
       <h5>Pending Requests</h5>
       <ul>
         @foreach (var r in Model.MyPending) {
-          <li>@r.CreatedAt.ToLocalTime(): @r.Status · <a href="@Model.GatewayBaseUrl@r.link" target="_blank">Open</a></li>
+          <li>@r.CreatedAt.ToLocalTime(): @r.Status · <a href="@Model.PublicBaseUrl@r.link" target="_blank">Open</a></li>
         }
       </ul>
     </div>

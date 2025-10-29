@@ -27,6 +27,8 @@ public class ApproveModel : PageModel
     public string[] ScopeList { get; private set; } = Array.Empty<string>();
     public string? ErrorMessage { get; private set; }
     public string? InfoMessage { get; private set; }
+    public string AgentName { get; private set; } = string.Empty;
+    public string BoardName { get; private set; } = string.Empty;
 
     public async Task<IActionResult> OnGetAsync(Guid id)
     {
@@ -186,5 +188,13 @@ public class ApproveModel : PageModel
 
         ScopeList = RequestEntity?.Scopes?.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                     ?? Array.Empty<string>();
+
+        if (RequestEntity is not null)
+        {
+            var agent = await _db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == RequestEntity.AgentTenantId);
+            var board = await _db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == RequestEntity.BoardTenantId);
+            AgentName = agent?.DisplayName ?? RequestEntity.AgentTenantId;
+            BoardName = board?.DisplayName ?? RequestEntity.BoardTenantId;
+        }
     }
 }

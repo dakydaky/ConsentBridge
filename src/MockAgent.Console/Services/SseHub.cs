@@ -9,9 +9,9 @@ public class SseHub
 
     public async Task SubscribeAsync(HttpResponse response, CancellationToken ct)
     {
-        response.Headers.Add("Content-Type", "text/event-stream");
-        response.Headers.Add("Cache-Control", "no-cache");
-        response.Headers.Add("Connection", "keep-alive");
+        response.ContentType = "text/event-stream";
+        response.Headers["Cache-Control"] = "no-cache";
+        response.Headers["Connection"] = "keep-alive";
 
         var id = Guid.NewGuid();
         var channel = Channel.CreateUnbounded<string>();
@@ -42,4 +42,3 @@ public class SseHub
         }
     }
 }
-

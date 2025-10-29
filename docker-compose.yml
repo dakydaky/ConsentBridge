@@ -68,6 +68,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       # Point to gateway in the compose network
       Gateway__BaseUrl: http://gateway:8080
+      Gateway__PublicBaseUrl: http://localhost:8080
       Gateway__OAuth__TokenEndpoint: /oauth/token
       Gateway__OAuth__ClientId: agent_acme_client
       Gateway__OAuth__ClientSecret: agent-secret
@@ -86,6 +87,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       Gateway__BaseUrl: http://gateway:8080
+      Gateway__PublicBaseUrl: http://localhost:8080
       Gateway__OAuth__TokenEndpoint: /oauth/token
       Gateway__OAuth__ClientId: agent_acme_client
       Gateway__OAuth__ClientSecret: agent-secret

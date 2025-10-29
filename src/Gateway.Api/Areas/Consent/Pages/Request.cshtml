@@ -10,9 +10,11 @@
 
 <h1>Verify your email to continue</h1>
 <p>
-    <strong>@Model.RequestEntity?.AgentTenantId</strong> is requesting consent to apply to
-    <strong>@Model.RequestEntity?.BoardTenantId</strong> on your behalf.
-</p>
+    <strong>@Model.AgentName</strong> is requesting consent to apply to
+    <strong>@Model.BoardName</strong> on your behalf.
+    <br />
+    <small style="opacity:.7">Powered by ConsentBridge</small>
+    </p>
 
 @if (!string.IsNullOrEmpty(Model.InfoMessage))
 {

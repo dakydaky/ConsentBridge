@@ -27,7 +27,7 @@ public class IndexModel : PageModel
     public List<AgentApiClient.ConsentRequestView> MyPending { get; set; } = new();
     public List<AgentApiClient.ConsentView> MyConsents { get; set; } = new();
     public List<AgentApiClient.ApplicationRecord> MyApplications { get; set; } = new();
-    public string GatewayBaseUrl => _opts.BaseUrl?.TrimEnd('/') ?? "";
+    public string PublicBaseUrl => (_opts.PublicBaseUrl ?? _opts.BaseUrl)?.TrimEnd('/') ?? "";
 
     public async Task OnGet()
     {
@@ -50,7 +50,7 @@ public class IndexModel : PageModel
             return RedirectToPage("/Login");
         }
         var id = await _api.CreateConsentRequestAsync(LoggedInEmail);
-        ConsentLink = $"{_opts.BaseUrl}/consent/{id}";
+        ConsentLink = $"{PublicBaseUrl}/consent/{id}";
         return RedirectToPage();
     }
 

@@ -26,6 +26,8 @@ public class RequestModel : PageModel
     public string[] ScopeList { get; private set; } = Array.Empty<string>();
     public string? ErrorMessage { get; private set; }
     public string? InfoMessage { get; private set; }
+    public string AgentName { get; private set; } = string.Empty;
+    public string BoardName { get; private set; } = string.Empty;
     public bool ShowVerificationForm => RequestEntity is not null
         && RequestEntity.Status == ConsentRequestStatus.Pending
         && RequestEntity.ExpiresAt > DateTime.UtcNow;
@@ -55,6 +57,7 @@ public class RequestModel : PageModel
         }
 
         AssignScopes();
+        await AssignNamesAsync();
         return Page();
     }
 
@@ -72,6 +75,7 @@ public class RequestModel : PageModel
         }
 
         AssignScopes();
+        await AssignNamesAsync();
 
         if (RequestEntity.ExpiresAt <= DateTime.UtcNow)
         {
@@ -138,6 +142,15 @@ public class RequestModel : PageModel
     {
         ScopeList = RequestEntity?.Scopes?.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                     ?? Array.Empty<string>();
+    }
+
+    private async Task AssignNamesAsync()
+    {
+        if (RequestEntity is null) return;
+        var agent = await _db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == RequestEntity.AgentTenantId);
+        var board = await _db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == RequestEntity.BoardTenantId);
+        AgentName = agent?.DisplayName ?? RequestEntity.AgentTenantId;
+        BoardName = board?.DisplayName ?? RequestEntity.BoardTenantId;
     }
 
     public class VerifyInput

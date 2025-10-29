@@ -37,7 +37,7 @@ app.MapGet("/events", async (HttpContext ctx, SseHub hub, CancellationToken ct) 
 });
 
 // Webhook receiver (dev-only)
-app.MapPost("/webhooks/consent", async (HttpRequest req, SseHub hub) =>
+app.MapPost("/webhooks/consent", (SseHub hub) =>
 {
     // Simply broadcast an update event; clients will pull fresh dashboard data
     hub.Broadcast("update");

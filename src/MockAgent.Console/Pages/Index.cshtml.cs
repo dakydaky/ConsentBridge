@@ -28,7 +28,7 @@ public class IndexModel : PageModel
         .ToList();
     public IReadOnlyList<AgentApiClient.ConsentView> Consents { get; private set; } = Array.Empty<AgentApiClient.ConsentView>();
     public IReadOnlyList<ApplicationItem> Applications => _state.Applications;
-    public string GatewayBaseUrl => _opts.BaseUrl?.TrimEnd('/') ?? "";
+    public string PublicBaseUrl => (_opts.PublicBaseUrl ?? _opts.BaseUrl)?.TrimEnd('/') ?? "";
 
     public async Task OnGet()
     {
@@ -62,13 +62,13 @@ public class IndexModel : PageModel
             {
                 consents,
                 pending,
-                gatewayBaseUrl = GatewayBaseUrl
+                publicBaseUrl = PublicBaseUrl
             });
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Dashboard data fetch failed");
-            return new JsonResult(new { consents = Array.Empty<object>(), pending = Array.Empty<object>(), gatewayBaseUrl = GatewayBaseUrl });
+            return new JsonResult(new { consents = Array.Empty<object>(), pending = Array.Empty<object>(), publicBaseUrl = PublicBaseUrl });
         }
     }
 
