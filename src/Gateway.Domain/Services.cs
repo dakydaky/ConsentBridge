@@ -47,3 +47,23 @@ public interface IDsrService
     Task<DsrExportResult?> ExportAsync(string tenantSlug, TenantType? tenantType, string candidateEmail, CancellationToken cancellationToken = default);
     Task<DsrDeleteResult> DeleteAsync(string tenantSlug, TenantType? tenantType, string candidateEmail, CancellationToken cancellationToken = default);
 }
+
+public interface IConsentLifecycleService
+{
+    Task<ConsentTokenIssueResult?> RenewAsync(Guid consentId, CancellationToken cancellationToken = default);
+}
+
+public interface IAuditEventSink
+{
+    Task EmitAsync(AuditEventDescriptor evt, CancellationToken cancellationToken = default);
+}
+
+public sealed record AuditEventDescriptor(
+    string Category,
+    string Action,
+    string EntityType,
+    string EntityId,
+    string Tenant,
+    DateTime CreatedAt,
+    string? Jti = null,
+    string? Metadata = null);

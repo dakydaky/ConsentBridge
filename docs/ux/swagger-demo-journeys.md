@@ -47,6 +47,14 @@ Welcome! These curated “choose‑your‑perspective” guides help you demo th
    - `GET /v1/applications/{id}` → verify `submissionSignature`, `submissionKeyId`, `receiptSignature`, `receiptHash`.
    - Bonus: open `http://localhost:8080/applications/{id}` for a gallery-style view.
 
+7. **🔄 Renew before expiry (lifecycle)**
+   - If your consent token is nearing expiry, call `POST /v1/consents/{id}/renew` with the consent ID.
+   - Paste the returned `token` into your application payload and re-run the submission.
+
+8. **⏲️ Token grace (lifecycle)**
+   - Submissions that arrive just after token expiry are accepted within a configured grace window.
+   - Look for an `AUDIT application token_grace_accept` log entry and persisted audit rows in the `AuditEvents` table.
+
 ---
 
 ## 🧑‍💼 Hiring Board — “Show me my receipt proof”

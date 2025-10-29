@@ -17,6 +17,8 @@ public class GatewayDbContext : DbContext
     public DbSet<ConsentRequest> ConsentRequests => Set<ConsentRequest>();
     public DbSet<TenantKey> TenantKeys => Set<TenantKey>();
     public DbSet<ConsentTokenRecord> ConsentTokens => Set<ConsentTokenRecord>();
+    public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+    public DbSet<AuditEventHash> AuditEventHashes => Set<AuditEventHash>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -76,6 +78,32 @@ public class GatewayDbContext : DbContext
             .HasOne(cr => cr.Consent)
             .WithMany()
             .HasForeignKey(cr => cr.ConsentId);
+
+        b.Entity<AuditEvent>()
+            .HasKey(a => a.Id);
+        b.Entity<AuditEvent>()
+            .Property(a => a.Category).HasMaxLength(64);
+        b.Entity<AuditEvent>()
+            .Property(a => a.Action).HasMaxLength(64);
+        b.Entity<AuditEvent>()
+            .Property(a => a.EntityType).HasMaxLength(64);
+        b.Entity<AuditEvent>()
+            .Property(a => a.EntityId).HasMaxLength(128);
+        b.Entity<AuditEvent>()
+            .Property(a => a.PayloadHash).HasMaxLength(128);
+        b.Entity<AuditEvent>()
+            .Property(a => a.Jti).HasMaxLength(64);
+        b.Entity<AuditEvent>()
+            .HasIndex(a => new { a.TenantId, a.Category, a.CreatedAt });
+
+        b.Entity<AuditEventHash>()
+            .HasKey(h => h.EventId);
+        b.Entity<AuditEventHash>()
+            .Property(h => h.PreviousHash).HasMaxLength(128);
+        b.Entity<AuditEventHash>()
+            .Property(h => h.CurrentHash).HasMaxLength(128);
+        b.Entity<AuditEventHash>()
+            .HasIndex(h => new { h.TenantChainId, h.CreatedAt });
         base.OnModelCreating(b);
     }
 }

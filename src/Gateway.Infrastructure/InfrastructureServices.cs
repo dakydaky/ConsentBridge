@@ -28,6 +28,20 @@ public static class InfrastructureServices
         services.AddScoped<IConsentKeyRotator>(sp =>
             (JwtConsentTokenFactory)sp.GetRequiredService<IConsentTokenFactory>());
         services.AddScoped<IDsrService, DsrService>();
+        services.Configure<ConsentLifecycleOptions>(configuration.GetSection("ConsentLifecycle"));
+        services.PostConfigure<ConsentLifecycleOptions>(options =>
+        {
+            if (options.RenewalLeadDays < 0)
+            {
+                throw new InvalidOperationException("ConsentLifecycle:RenewalLeadDays must be >= 0.");
+            }
+            if (options.ExpiryGraceDays < 0)
+            {
+                throw new InvalidOperationException("ConsentLifecycle:ExpiryGraceDays must be >= 0.");
+            }
+        });
+        services.AddScoped<IConsentLifecycleService, ConsentLifecycleService>();
+        services.AddScoped<IAuditEventSink, PersistentAuditEventSink>();
         services.Configure<RetentionOptions>(configuration.GetSection("Retention"));
         services.Configure<ConsentTokenOptions>(configuration.GetSection("ConsentTokens"));
         services.AddScoped<DataRetentionExecutor>();
