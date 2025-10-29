@@ -47,13 +47,13 @@ Welcome! These curated “choose‑your‑perspective” guides help you demo th
    - `GET /v1/applications/{id}` → verify `submissionSignature`, `submissionKeyId`, `receiptSignature`, `receiptHash`.
    - Bonus: open `http://localhost:8080/applications/{id}` for a gallery-style view.
 
-7. **🔄 Renew before expiry (new)**
+7. **🔄 Renew before expiry (lifecycle)**
    - If your consent token is nearing expiry, call `POST /v1/consents/{id}/renew` with the consent ID.
    - Paste the returned `token` into your application payload and re-run the submission.
 
-8. **⏲️ Token grace (new)**
-   - Submissions that arrive just after token expiry are accepted within the configured grace window.
-   - Look for an `AUDIT application token_grace_accept` log entry in the gateway output.
+8. **⏲️ Token grace (lifecycle)**
+   - Submissions that arrive just after token expiry are accepted within a configured grace window.
+   - Look for an `AUDIT application token_grace_accept` log entry and persisted audit rows in the `AuditEvents` table.
 
 ---
 
@@ -130,6 +130,16 @@ Use Swagger to back up compliance talking points:
 
 4. **🔄 JWKS rotation rehearsal**
    - Swap the JWKS file for MockBoard, restart gateway, re-run the submission to confirm verification switches to the new key.
+
+### 🔎 Audit Events & Correlation IDs
+
+- Categories/actions recorded in audit logs and tables:
+  - `consent`: `issued`, `denied`, `revoked`
+  - `application`: `created`, `accepted`, `failed`, `receipt_missing`, `token_grace_accept`, `token_grace_reject`
+  - `receipt`: `verified`, `verification_failed`
+  - `keys`: `rotation`
+- Correlation ID:
+  - Send an `X-Correlation-ID` header; it is attached to audit `metadata` (`cid=<your-id>`). If missing, the server `TraceIdentifier` is used.
 
 ---
 

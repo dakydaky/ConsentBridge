@@ -14,6 +14,7 @@ public class JwtConsentTokenFactoryTests
 {
     private const string AgentSlug = "agent_acme";
     private const string BoardSlug = "mockboard_eu";
+    private sealed class NoopAuditSink : IAuditEventSink { public Task EmitAsync(AuditEventDescriptor evt, CancellationToken cancellationToken = default) => Task.CompletedTask; }
 
     [Fact]
     public void IssueToken_CreatesJwt_ES256_WithExpectedClaims_AndLedgerHash()
@@ -28,7 +29,7 @@ public class JwtConsentTokenFactoryTests
             KeyLifetimeDays = 365,
             RotationLeadDays = 30
         });
-        var factory = new JwtConsentTokenFactory(db, new NoopDataProtectionProvider(), options, new TestLogger<JwtConsentTokenFactory>());
+        var factory = new JwtConsentTokenFactory(db, new NoopDataProtectionProvider(), options, new TestLogger<JwtConsentTokenFactory>(), new NoopAuditSink());
 
         var candidate = new Candidate { Id = Guid.NewGuid(), EmailHash = "alice@example.com", CreatedAt = DateTime.UtcNow };
         db.Candidates.Add(candidate);
@@ -106,7 +107,7 @@ public class JwtConsentTokenFactoryTests
             KeyLifetimeDays = 30, // factory clamps minimum to 30
             RotationLeadDays = 30 // equal to lifetime → triggers rotation on subsequent issuance
         });
-        var factory = new JwtConsentTokenFactory(db, new NoopDataProtectionProvider(), options, new TestLogger<JwtConsentTokenFactory>());
+        var factory = new JwtConsentTokenFactory(db, new NoopDataProtectionProvider(), options, new TestLogger<JwtConsentTokenFactory>(), new NoopAuditSink());
 
         var candidate = new Candidate { Id = Guid.NewGuid(), EmailHash = "bob@example.com", CreatedAt = DateTime.UtcNow };
         db.Candidates.Add(candidate);
@@ -155,7 +156,7 @@ public class JwtConsentTokenFactoryTests
             KeyLifetimeDays = 30,
             RotationLeadDays = 0
         });
-        var factory = new JwtConsentTokenFactory(db, new NoopDataProtectionProvider(), options, new TestLogger<JwtConsentTokenFactory>());
+        var factory = new JwtConsentTokenFactory(db, new NoopDataProtectionProvider(), options, new TestLogger<JwtConsentTokenFactory>(), new NoopAuditSink());
 
         var candidate = new Candidate { Id = Guid.NewGuid(), EmailHash = "carol@example.com", CreatedAt = DateTime.UtcNow };
         db.Candidates.Add(candidate);
@@ -194,7 +195,7 @@ public class JwtConsentTokenFactoryTests
     {
         using var db = CreateDb();
         var options = Options.Create(new ConsentTokenOptions());
-        var factory = new JwtConsentTokenFactory(db, new NoopDataProtectionProvider(), options, new TestLogger<JwtConsentTokenFactory>());
+        var factory = new JwtConsentTokenFactory(db, new NoopDataProtectionProvider(), options, new TestLogger<JwtConsentTokenFactory>(), new NoopAuditSink());
 
         var candidate = new Candidate { Id = Guid.NewGuid(), EmailHash = "nobody@example.com", CreatedAt = DateTime.UtcNow };
         var consent = new Consent
@@ -265,3 +266,4 @@ public class JwtConsentTokenFactoryTests
         }
     }
 }
+

@@ -63,9 +63,9 @@ Demonstrate how consent JWTs are signed, exposed via JWKS, and rotated on demand
    - Re-run `GET /.well-known/jwks.json`—you’ll see both keys (retired + active) until the old one ages out.
    - Optional: `POST /v1/applications` with the new JWT to prove the backend accepts the rotated key.
 
-8. **(New) Renewal & grace demo**
-   - Issue a consent and then call `POST /v1/consents/{id}/renew` to show renewal without OTP.
-   - For grace acceptance, reduce `ConsentLifecycle:ExpiryGraceDays` and submit just after token expiry; observe audit `application token_grace_accept`.
+8. **(Lifecycle) Renewal & grace**
+   - Issue a consent then call `POST /v1/consents/{id}/renew` to show renewal without OTP.
+   - For grace acceptance, reduce `ConsentLifecycle:ExpiryGraceDays` and submit just after token expiry; observe audit `application token_grace_accept` and persisted `AuditEvents` rows.
 
 ---
 
@@ -80,6 +80,8 @@ Demonstrate how consent JWTs are signed, exposed via JWKS, and rotated on demand
 | 5 | `POST /debug/tenants/{slug}/rotate-consent-key` | Forces new tenant key generation (dev only) |
 | 6 | Browser `/consent/{id}` (again) | Shows a JWT signed by the rotated key |
 | 7 | `GET /.well-known/jwks.json`, `POST /v1/applications` | Confirms JWKS + submission validation post-rotation |
+| 8 | `POST /internal/audit/verify` | Runs audit chain verification for a tenant window |
+| 9 | `GET /internal/audit/status` | Shows recent verification runs and anchors |
 
 ---
 

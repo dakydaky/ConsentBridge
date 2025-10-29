@@ -118,12 +118,20 @@ if (app.Environment.IsDevelopment())
     app.MapPost("/debug/tenants/{slug}/rotate-consent-key", async (
         string slug,
         IConsentKeyRotator rotator,
+        IAuditEventSink audit,
         ILogger<Program> logger,
         CancellationToken cancellationToken) =>
     {
         try
         {
             var key = await rotator.RotateAsync(slug, cancellationToken);
+            await audit.EmitAsync(new AuditEventDescriptor(
+                Category: "keys",
+                Action: "rotation",
+                EntityType: nameof(TenantKey),
+                EntityId: key.KeyId,
+                Tenant: slug,
+                CreatedAt: DateTime.UtcNow));
             return Results.Ok(new
             {
                 tenant = slug,
@@ -364,6 +372,7 @@ app.MapPost("/v1/applications", async (
     IJwsVerifier verifier,
     IOptions<ConsentTokenOptions> consentTokenOptions,
     IOptions<ConsentLifecycleOptions> lifecycleOptions,
+    HttpContext http,
     IAuditEventSink audit,
     ILogger<Program> logger) =>
 {
@@ -566,6 +575,15 @@ app.MapPost("/v1/applications", async (
     };
     db.Applications.Add(appRec);
     await db.SaveChangesAsync();
+    var corr = http.Request.Headers.TryGetValue("X-Correlation-ID", out var cid) ? cid.ToString() : http.TraceIdentifier;
+    await audit.EmitAsync(new AuditEventDescriptor(
+        Category: "application",
+        Action: "created",
+        EntityType: nameof(Application),
+        EntityId: appRec.Id.ToString(),
+        Tenant: appRec.AgentTenantId,
+        CreatedAt: DateTime.UtcNow,
+        Metadata: $"cid={corr}"));
 
     var client = httpFactory.CreateClient("mockboard");
     var resp = await client.PostAsJsonAsync("/v1/mock/applications", new
@@ -592,6 +610,14 @@ app.MapPost("/v1/applications", async (
         if (envelope?.Receipt is null || string.IsNullOrWhiteSpace(envelope.ReceiptSignature))
         {
             logger.LogWarning("Board receipt missing payload or signature for application {ApplicationId}", appRec.Id);
+            await audit.EmitAsync(new AuditEventDescriptor(
+                Category: "application",
+                Action: "receipt_missing",
+                EntityType: nameof(Application),
+                EntityId: appRec.Id.ToString(),
+                Tenant: appRec.AgentTenantId,
+                CreatedAt: DateTime.UtcNow,
+                Metadata: $"cid={corr}"));
         }
         else
         {
@@ -603,15 +629,47 @@ app.MapPost("/v1/applications", async (
                 appRec.ReceiptSignature = envelope.ReceiptSignature;
                 appRec.ReceiptHash = Convert.ToHexString(SHA256.HashData(receiptBytes));
                 await db.SaveChangesAsync();
+                await audit.EmitAsync(new AuditEventDescriptor(
+                    Category: "application",
+                    Action: "accepted",
+                    EntityType: nameof(Application),
+                    EntityId: appRec.Id.ToString(),
+                    Tenant: appRec.AgentTenantId,
+                    CreatedAt: DateTime.UtcNow,
+                    Metadata: $"cid={corr}"));
+                await audit.EmitAsync(new AuditEventDescriptor(
+                    Category: "receipt",
+                    Action: "verified",
+                    EntityType: nameof(Application),
+                    EntityId: appRec.Id.ToString(),
+                    Tenant: appRec.AgentTenantId,
+                    CreatedAt: DateTime.UtcNow,
+                    Metadata: $"cid={corr}"));
                 return Results.Accepted($"/v1/applications/{appRec.Id}", new { id = appRec.Id, status = appRec.Status });
             }
 
             logger.LogWarning("Receipt signature validation failed for application {ApplicationId}", appRec.Id);
+            await audit.EmitAsync(new AuditEventDescriptor(
+                Category: "receipt",
+                Action: "verification_failed",
+                EntityType: nameof(Application),
+                EntityId: appRec.Id.ToString(),
+                Tenant: appRec.AgentTenantId,
+                CreatedAt: DateTime.UtcNow,
+                Metadata: $"cid={corr}"));
         }
     }
 
     appRec.Status = ApplicationStatus.Failed;
     await db.SaveChangesAsync();
+    await audit.EmitAsync(new AuditEventDescriptor(
+        Category: "application",
+        Action: "failed",
+        EntityType: nameof(Application),
+        EntityId: appRec.Id.ToString(),
+        Tenant: appRec.AgentTenantId,
+        CreatedAt: DateTime.UtcNow,
+        Metadata: $"cid={corr}"));
     return Results.StatusCode(502);
 }).RequireAuthorization("apply.submit")
   .WithTags("Applications")
@@ -634,7 +692,7 @@ app.MapGet("/v1/applications/{id:guid}", async Task<Results<NotFound, Ok<Applica
       return op;
   });
 
-app.MapPost("/v1/consents/{id:guid}/revoke", async (Guid id, GatewayDbContext db) =>
+app.MapPost("/v1/consents/{id:guid}/revoke", async (Guid id, GatewayDbContext db, HttpContext http, IAuditEventSink audit) =>
 {
     var consent = await db.Consents.FindAsync(id);
     if (consent is null)
@@ -645,6 +703,15 @@ app.MapPost("/v1/consents/{id:guid}/revoke", async (Guid id, GatewayDbContext db
     consent.Status = ConsentStatus.Revoked;
     consent.RevokedAt = DateTime.UtcNow;
     await db.SaveChangesAsync();
+    var corr = http.Request.Headers.TryGetValue("X-Correlation-ID", out var rcid) ? rcid.ToString() : http.TraceIdentifier;
+    await audit.EmitAsync(new AuditEventDescriptor(
+        Category: "consent",
+        Action: "revoked",
+        EntityType: nameof(Consent),
+        EntityId: consent.Id.ToString(),
+        Tenant: consent.AgentTenantId,
+        CreatedAt: DateTime.UtcNow,
+        Metadata: $"cid={corr}"));
     return Results.NoContent();
 });
 
@@ -787,6 +854,44 @@ app.MapGet("/internal/tenants", () => Results.StatusCode(StatusCodes.Status501No
        op.Summary = "Tenant listing (admin) - placeholder";
        return op;
    });
+
+app.MapPost("/internal/audit/verify", async (
+    [FromQuery] string tenant,
+    [FromQuery] int? days,
+    IAuditVerifier verifier) =>
+{
+    if (string.IsNullOrWhiteSpace(tenant))
+    {
+        return Results.BadRequest(new { error = "tenant_required" });
+    }
+
+    var end = DateTime.UtcNow;
+    var start = end.AddDays(-Math.Clamp(days ?? 1, 1, 30));
+    var result = await verifier.VerifyAsync(tenant, start, end);
+    return Results.Ok(result);
+}).WithTags("Internal").WithOpenApi(op =>
+{
+    op.Summary = "Run audit integrity verification";
+    return op;
+});
+
+app.MapGet("/internal/audit/status", async (
+    [FromQuery] string tenant,
+    [FromQuery] int? take,
+    IAuditVerifier verifier) =>
+{
+    if (string.IsNullOrWhiteSpace(tenant))
+    {
+        return Results.BadRequest(new { error = "tenant_required" });
+    }
+
+    var rows = await verifier.GetRecentRunsAsync(tenant, Math.Clamp(take ?? 10, 1, 100));
+    return Results.Ok(rows);
+}).WithTags("Internal").WithOpenApi(op =>
+{
+    op.Summary = "List recent audit verification runs";
+    return op;
+});
 
 app.MapRazorPages();
 app.Run();

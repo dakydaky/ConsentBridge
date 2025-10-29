@@ -33,7 +33,7 @@ public class ConsentLifecycleServiceTests
         db.SaveChanges();
 
         var tokenOptions = Options.Create(new ConsentTokenOptions());
-        var factory = new JwtConsentTokenFactory(db, new NoopDataProtectionProvider(), tokenOptions, new TestLogger<JwtConsentTokenFactory>());
+        var factory = new JwtConsentTokenFactory(db, new NoopDataProtectionProvider(), tokenOptions, new TestLogger<JwtConsentTokenFactory>(), new NoopAuditSink());
         var lifecycleOptions = Options.Create(new ConsentLifecycleOptions { RenewalLeadDays = 7, ExpiryGraceDays = 3 });
         var service = new ConsentLifecycleService(db, factory, lifecycleOptions, new NoopAuditSink());
 
@@ -68,7 +68,7 @@ public class ConsentLifecycleServiceTests
         db.SaveChanges();
 
         var tokenOptions = Options.Create(new ConsentTokenOptions());
-        var factory = new JwtConsentTokenFactory(db, new NoopDataProtectionProvider(), tokenOptions, new TestLogger<JwtConsentTokenFactory>());
+        var factory = new JwtConsentTokenFactory(db, new NoopDataProtectionProvider(), tokenOptions, new TestLogger<JwtConsentTokenFactory>(), new NoopAuditSink());
         var lifecycleOptions = Options.Create(new ConsentLifecycleOptions { RenewalLeadDays = 7, ExpiryGraceDays = 3 });
         var service = new ConsentLifecycleService(db, factory, lifecycleOptions, new NoopAuditSink());
 
@@ -100,7 +100,7 @@ public class ConsentLifecycleServiceTests
         db.SaveChanges();
 
         var tokenOptions = Options.Create(new ConsentTokenOptions());
-        var factory = new JwtConsentTokenFactory(db, new NoopDataProtectionProvider(), tokenOptions, new TestLogger<JwtConsentTokenFactory>());
+        var factory = new JwtConsentTokenFactory(db, new NoopDataProtectionProvider(), tokenOptions, new TestLogger<JwtConsentTokenFactory>(), new NoopAuditSink());
         var lifecycleOptions = Options.Create(new ConsentLifecycleOptions { RenewalLeadDays = 7, ExpiryGraceDays = 3 });
         var service = new ConsentLifecycleService(db, factory, lifecycleOptions, new NoopAuditSink());
 
@@ -158,3 +158,4 @@ public class ConsentLifecycleServiceTests
         public Task EmitAsync(AuditEventDescriptor evt, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }
+

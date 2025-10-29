@@ -2,7 +2,7 @@
 
 | Field   | Value |
 |---------|-------|
-| Status  | Proposed |
+| Status  | Accepted |
 | Date    | 2025-10-28 |
 | Owners  | Platform Team |
 | Tags    | compliance, persistence, auditing |
@@ -57,11 +57,11 @@ Implement dedicated audit tables (`audit_events`, `audit_event_hashes`) within t
 - **Implementation complexity** — Provide canonical serialization helper to avoid hash drift and unit-test chain generation.
 
 ## Implementation Plan
-1. **Schema migration** — Create audit tables and supporting indexes (tenant, category, created_at).
-2. **Canonicalization utilities** — Build helper for canonical JSON encoding used for hashes.
-3. **Emit audit events** — Hook into consent issuance/revocation, token issuance, application submission, receipt verification, key rotation.
-4. **Integrity verification job** — Background job recalculates hashes, ensures no gaps, and exports daily digests.
-5. **DSR integration** — Include relevant audit entries in DSR export pipeline.
+1. ✅ Schema migration — Create audit tables and supporting indexes (tenant, category, created_at).
+2. ✅ Canonicalization utilities — Deterministic canonical representation for hash chain.
+3. 🚧 Emit audit events — Lifecycle renewal and token grace acceptance wired; extend to revocation, application submission, receipt verification, key rotation.
+4. ⏳ Integrity verification job — Background job recalculates hashes, ensures no gaps, and exports daily digests.
+5. ⏳ DSR integration — Include relevant audit entries in DSR export pipeline.
 
 ## Follow-up Actions
 - Integrate with security monitoring to alert on hash chain breaks.

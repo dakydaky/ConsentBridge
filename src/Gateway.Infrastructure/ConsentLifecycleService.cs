@@ -6,8 +6,8 @@ namespace Gateway.Infrastructure;
 
 public sealed class ConsentLifecycleOptions
 {
-    public int RenewalLeadDays { get; set; } = 14; // allow renewal when within N days before expiry
-    public int ExpiryGraceDays { get; set; } = 7;  // allow renewal up to N days after expiry
+    public int RenewalLeadDays { get; set; } = 14;
+    public int ExpiryGraceDays { get; set; } = 7;
 }
 
 public sealed class ConsentLifecycleService : IConsentLifecycleService
@@ -46,20 +46,23 @@ public sealed class ConsentLifecycleService : IConsentLifecycleService
         var now = DateTime.UtcNow;
         if (consent.ExpiresAt <= now)
         {
+            await TryAuditAsync(consent, false, reason: "consent_expired", cancellationToken: cancellationToken);
+            GatewayMetrics.ConsentRenewalsDenied.Add(1, new KeyValuePair<string, object?>("tenant", consent.AgentTenantId));
             return null;
         }
+
         var windowStart = consent.TokenExpiresAt.AddDays(-Math.Max(0, _options.RenewalLeadDays));
         var windowEnd = consent.TokenExpiresAt.AddDays(Math.Max(0, _options.ExpiryGraceDays));
         if (now < windowStart || now > windowEnd)
         {
-            await TryAuditAsync(consent, success: false, reason: "window_violation", cancellationToken: cancellationToken);
+            await TryAuditAsync(consent, false, reason: "window_violation", cancellationToken: cancellationToken);
             GatewayMetrics.ConsentRenewalsDenied.Add(1, new KeyValuePair<string, object?>("tenant", consent.AgentTenantId));
             return null;
         }
 
         var result = _tokenFactory.IssueToken(consent, consent.Candidate);
         await _db.SaveChangesAsync(cancellationToken);
-        await TryAuditAsync(consent, success: true, jti: result.TokenId.ToString(), cancellationToken: cancellationToken);
+        await TryAuditAsync(consent, true, jti: result.TokenId.ToString(), cancellationToken: cancellationToken);
         GatewayMetrics.ConsentRenewalsSuccess.Add(1, new KeyValuePair<string, object?>("tenant", consent.AgentTenantId));
         return result;
     }
@@ -84,3 +87,4 @@ public sealed class ConsentLifecycleService : IConsentLifecycleService
         }
     }
 }
+

@@ -162,3 +162,42 @@ public enum ConsentRequestStatus
     Denied = 4,
     Expired = 5
 }
+
+// Audit trail entities (ADR 0003)
+public class AuditEvent
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public string Category { get; set; } = default!;
+    public string Action { get; set; } = default!;
+    public string EntityType { get; set; } = default!;
+    public string EntityId { get; set; } = default!;
+    public string? PayloadHash { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public string? ActorType { get; set; }
+    public string? ActorId { get; set; }
+    public string? Jti { get; set; }
+    public string? Metadata { get; set; }
+}
+
+public class AuditEventHash
+{
+    public Guid EventId { get; set; }
+    public Guid TenantChainId { get; set; }
+    public string PreviousHash { get; set; } = default!;
+    public string CurrentHash { get; set; } = default!;
+    public DateTime CreatedAt { get; set; }
+}
+
+public class AuditVerificationRun
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public DateTime WindowStartUtc { get; set; }
+    public DateTime WindowEndUtc { get; set; }
+    public string PreviousHash { get; set; } = string.Empty;
+    public string ComputedHash { get; set; } = string.Empty;
+    public bool Success { get; set; }
+    public string? Error { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
+}

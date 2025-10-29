@@ -60,16 +60,20 @@ public sealed class JwtConsentTokenFactory : IConsentTokenFactory, IConsentKeyRo
     private readonly TimeSpan _keyLifetime;
     private readonly TimeSpan _rotationLeadTime;
 
+    private readonly IAuditEventSink? _audit;
+
     public JwtConsentTokenFactory(
         GatewayDbContext db,
         IDataProtectionProvider dataProtectionProvider,
         IOptions<ConsentTokenOptions> options,
-        ILogger<JwtConsentTokenFactory> logger)
+        ILogger<JwtConsentTokenFactory> logger,
+        IAuditEventSink? audit = null)
     {
         _db = db;
         _protector = dataProtectionProvider.CreateProtector(ProtectorPurpose);
         _options = options.Value ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _audit = audit;
 
         _tokenLifetime = TimeSpan.FromDays(Math.Max(1, _options.TokenLifetimeDays));
         _keyLifetime = TimeSpan.FromDays(Math.Max(30, _options.KeyLifetimeDays));
@@ -217,6 +221,17 @@ public sealed class JwtConsentTokenFactory : IConsentTokenFactory, IConsentKeyRo
 
         _db.TenantKeys.Add(newKey);
         _logger.LogInformation("Generated new consent signing key {KeyId} for tenant {Tenant}", keyId, tenant.Slug);
+        try
+        {
+            _audit?.EmitAsync(new AuditEventDescriptor(
+                Category: "keys",
+                Action: "rotation",
+                EntityType: nameof(TenantKey),
+                EntityId: keyId,
+                Tenant: tenant.Slug,
+                CreatedAt: DateTime.UtcNow)).GetAwaiter().GetResult();
+        }
+        catch { }
         return newKey;
     }
 

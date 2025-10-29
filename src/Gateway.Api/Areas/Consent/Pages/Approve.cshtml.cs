@@ -11,12 +11,14 @@ public class ApproveModel : PageModel
     private readonly GatewayDbContext _db;
     private readonly IConsentTokenFactory _tokenFactory;
     private readonly ILogger<ApproveModel> _logger;
+    private readonly IAuditEventSink _audit;
 
-    public ApproveModel(GatewayDbContext db, IConsentTokenFactory tokenFactory, ILogger<ApproveModel> logger)
+    public ApproveModel(GatewayDbContext db, IConsentTokenFactory tokenFactory, ILogger<ApproveModel> logger, IAuditEventSink audit)
     {
         _db = db;
         _tokenFactory = tokenFactory;
         _logger = logger;
+        _audit = audit;
     }
 
     public ConsentRequest? RequestEntity { get; private set; }
@@ -68,6 +70,15 @@ public class ApproveModel : PageModel
             RequestEntity.Status = ConsentRequestStatus.Denied;
             RequestEntity.DecisionAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
+            var corr = HttpContext.Request.Headers.TryGetValue("X-Correlation-ID", out var cid) ? cid.ToString() : HttpContext.TraceIdentifier;
+            await _audit.EmitAsync(new AuditEventDescriptor(
+                Category: "consent",
+                Action: "denied",
+                EntityType: nameof(ConsentRequest),
+                EntityId: RequestEntity.Id.ToString(),
+                Tenant: RequestEntity.AgentTenantId,
+                CreatedAt: DateTime.UtcNow,
+                Metadata: $"cid={corr}"));
             TempData["ConsentStatus"] = "denied";
             return RedirectToPage("Complete", new { id });
         }
@@ -119,6 +130,17 @@ public class ApproveModel : PageModel
         await _db.SaveChangesAsync();
 
         _logger.LogInformation("Consent request {RequestId} approved. Consent {ConsentId}.", RequestEntity.Id, consent.Id);
+
+        var corr2 = HttpContext.Request.Headers.TryGetValue("X-Correlation-ID", out var cid2) ? cid2.ToString() : HttpContext.TraceIdentifier;
+        await _audit.EmitAsync(new AuditEventDescriptor(
+            Category: "consent",
+            Action: "issued",
+            EntityType: nameof(Consent),
+            EntityId: consent.Id.ToString(),
+            Tenant: consent.AgentTenantId,
+            CreatedAt: DateTime.UtcNow,
+            Jti: consent.TokenId.ToString(),
+            Metadata: $"cid={corr2}"));
 
         TempData["ConsentStatus"] = "approved";
         TempData["ConsentToken"] = issued.Token;

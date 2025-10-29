@@ -64,7 +64,8 @@ public record DsrExportResult(
     DateTime? CandidateCreatedAt,
     IReadOnlyList<DsrConsentRecord> Consents,
     IReadOnlyList<DsrApplicationRecord> Applications,
-    IReadOnlyList<DsrConsentRequestRecord> ConsentRequests);
+    IReadOnlyList<DsrConsentRequestRecord> ConsentRequests,
+    IReadOnlyList<DsrAuditEventRecord> AuditEvents);
 
 public record DsrConsentRecord(
     Guid Id,
@@ -101,6 +102,16 @@ public record DsrConsentRequestRecord(
     DateTime ExpiresAt,
     DateTime? VerifiedAt,
     DateTime? DecisionAt);
+
+public record DsrAuditEventRecord(
+    Guid Id,
+    string Category,
+    string Action,
+    string EntityType,
+    string EntityId,
+    DateTime CreatedAt,
+    string? Jti,
+    string? Metadata);
 
 public record DsrDeleteResult(
     int ConsentsDeleted,
