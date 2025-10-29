@@ -188,3 +188,16 @@ public class AuditEventHash
     public string CurrentHash { get; set; } = default!;
     public DateTime CreatedAt { get; set; }
 }
+
+public class AuditVerificationRun
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public DateTime WindowStartUtc { get; set; }
+    public DateTime WindowEndUtc { get; set; }
+    public string PreviousHash { get; set; } = string.Empty;
+    public string ComputedHash { get; set; } = string.Empty;
+    public bool Success { get; set; }
+    public string? Error { get; set; }
+    public DateTime CreatedAtUtc { get; set; }
+}

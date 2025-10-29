@@ -788,6 +788,44 @@ app.MapGet("/internal/tenants", () => Results.StatusCode(StatusCodes.Status501No
        return op;
    });
 
+app.MapPost("/internal/audit/verify", async (
+    [FromQuery] string tenant,
+    [FromQuery] int? days,
+    IAuditVerifier verifier) =>
+{
+    if (string.IsNullOrWhiteSpace(tenant))
+    {
+        return Results.BadRequest(new { error = "tenant_required" });
+    }
+
+    var end = DateTime.UtcNow;
+    var start = end.AddDays(-Math.Clamp(days ?? 1, 1, 30));
+    var result = await verifier.VerifyAsync(tenant, start, end);
+    return Results.Ok(result);
+}).WithTags("Internal").WithOpenApi(op =>
+{
+    op.Summary = "Run audit integrity verification";
+    return op;
+});
+
+app.MapGet("/internal/audit/status", async (
+    [FromQuery] string tenant,
+    [FromQuery] int? take,
+    IAuditVerifier verifier) =>
+{
+    if (string.IsNullOrWhiteSpace(tenant))
+    {
+        return Results.BadRequest(new { error = "tenant_required" });
+    }
+
+    var rows = await verifier.GetRecentRunsAsync(tenant, Math.Clamp(take ?? 10, 1, 100));
+    return Results.Ok(rows);
+}).WithTags("Internal").WithOpenApi(op =>
+{
+    op.Summary = "List recent audit verification runs";
+    return op;
+});
+
 app.MapRazorPages();
 app.Run();
 

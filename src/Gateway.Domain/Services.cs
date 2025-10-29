@@ -67,3 +67,30 @@ public sealed record AuditEventDescriptor(
     DateTime CreatedAt,
     string? Jti = null,
     string? Metadata = null);
+
+public interface IAuditVerifier
+{
+    Task<AuditVerificationResult> VerifyAsync(string tenantSlug, DateTime windowStartUtc, DateTime windowEndUtc, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<AuditVerificationRunDto>> GetRecentRunsAsync(string tenantSlug, int take = 10, CancellationToken cancellationToken = default);
+}
+
+public sealed record AuditVerificationResult(
+    bool Success,
+    string TenantSlug,
+    DateTime WindowStartUtc,
+    DateTime WindowEndUtc,
+    string PreviousHash,
+    string ComputedHash,
+    Guid? FirstMismatchEventId,
+    string? Error);
+
+public sealed record AuditVerificationRunDto(
+    Guid Id,
+    string TenantSlug,
+    DateTime WindowStartUtc,
+    DateTime WindowEndUtc,
+    bool Success,
+    string PreviousHash,
+    string ComputedHash,
+    DateTime CreatedAtUtc,
+    string? Error);

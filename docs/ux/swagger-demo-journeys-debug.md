@@ -80,6 +80,8 @@ Demonstrate how consent JWTs are signed, exposed via JWKS, and rotated on demand
 | 5 | `POST /debug/tenants/{slug}/rotate-consent-key` | Forces new tenant key generation (dev only) |
 | 6 | Browser `/consent/{id}` (again) | Shows a JWT signed by the rotated key |
 | 7 | `GET /.well-known/jwks.json`, `POST /v1/applications` | Confirms JWKS + submission validation post-rotation |
+| 8 | `POST /internal/audit/verify` | Runs audit chain verification for a tenant window |
+| 9 | `GET /internal/audit/status` | Shows recent verification runs and anchors |
 
 ---
 

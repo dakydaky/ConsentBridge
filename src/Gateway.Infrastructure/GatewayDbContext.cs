@@ -19,6 +19,7 @@ public class GatewayDbContext : DbContext
     public DbSet<ConsentTokenRecord> ConsentTokens => Set<ConsentTokenRecord>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
     public DbSet<AuditEventHash> AuditEventHashes => Set<AuditEventHash>();
+    public DbSet<AuditVerificationRun> AuditVerificationRuns => Set<AuditVerificationRun>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -104,6 +105,11 @@ public class GatewayDbContext : DbContext
             .Property(h => h.CurrentHash).HasMaxLength(128);
         b.Entity<AuditEventHash>()
             .HasIndex(h => new { h.TenantChainId, h.CreatedAt });
+        
+        b.Entity<AuditVerificationRun>()
+            .HasKey(v => v.Id);
+        b.Entity<AuditVerificationRun>()
+            .HasIndex(v => new { v.TenantId, v.CreatedAtUtc });
         base.OnModelCreating(b);
     }
 }
