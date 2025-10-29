@@ -52,6 +52,26 @@ public class IndexModel : PageModel
         }
     }
 
+    public async Task<IActionResult> OnGetData()
+    {
+        try
+        {
+            var consents = await _api.GetConsentsAsync(50);
+            var pending = await _api.GetConsentRequestsAsync(status: "Pending", take: 50);
+            return new JsonResult(new
+            {
+                consents,
+                pending,
+                gatewayBaseUrl = GatewayBaseUrl
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Dashboard data fetch failed");
+            return new JsonResult(new { consents = Array.Empty<object>(), pending = Array.Empty<object>(), gatewayBaseUrl = GatewayBaseUrl });
+        }
+    }
+
     public async Task<IActionResult> OnPostRevokeAsync(Guid id)
     {
         try { await _api.RevokeConsentAsync(id); } catch (Exception ex) { _logger.LogWarning(ex, "Revoke failed"); }

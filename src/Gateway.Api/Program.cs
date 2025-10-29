@@ -15,6 +15,7 @@ using Serilog;
 using System.Text;
 using Microsoft.AspNetCore.DataProtection;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Http.HttpResults;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -106,6 +107,11 @@ builder.Services.AddDataProtection()
     .SetApplicationName("ConsentBridge.Gateway");
 
 builder.Services.AddRazorPages();
+// Serialize enums as strings across the API for consistent client contracts
+builder.Services.ConfigureHttpJsonOptions(o =>
+{
+    o.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
@@ -433,6 +439,40 @@ app.MapGet("/v1/consents/{id:guid}", async (
 
     return Results.Ok(ApiHelpers.MapConsent(consent));
 }).RequireAuthorization("apply.submit");
+
+app.MapGet("/v1/applications", async (
+    ClaimsPrincipal user,
+    [FromQuery] string? email,
+    [FromQuery] int? take,
+    GatewayDbContext db) =>
+{
+    var (tenantSlug, tenantType) = AuthHelpers.GetTenantContext(user);
+    if (tenantSlug is null || tenantType != TenantType.Agent)
+    {
+        return Results.Forbid();
+    }
+    var size = Math.Clamp(take ?? 50, 1, 200);
+    var query = db.Applications.AsNoTracking()
+        .Where(a => a.AgentTenantId == tenantSlug)
+        .OrderByDescending(a => a.SubmittedAt)
+        .Take(size);
+    if (!string.IsNullOrWhiteSpace(email))
+    {
+        var norm = email.Trim().ToLowerInvariant();
+        query = db.Applications.AsNoTracking()
+            .Where(a => a.AgentTenantId == tenantSlug && db.Consents.Any(c => c.Id == a.ConsentId && c.ApprovedByEmail == norm))
+            .OrderByDescending(a => a.SubmittedAt)
+            .Take(size);
+    }
+    var rows = await query.ToListAsync();
+    return Results.Ok(rows.Select(ApiHelpers.MapApplication));
+}).RequireAuthorization("apply.submit")
+  .WithTags("Applications")
+  .WithOpenApi(op =>
+  {
+      op.Summary = "List applications (optional filter by candidate email)";
+      return op;
+  });
 
 app.MapPost("/v1/applications", async (
     [FromHeader(Name = "X-JWS-Signature")] string? jws,

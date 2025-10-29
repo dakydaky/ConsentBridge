@@ -1,0 +1,44 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - ConsentBridge</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/Candidate.Portal.styles.css" asp-append-version="true" />
+</head>
+<body>
+    <header class="cb-header">
+        <div class="container d-flex align-items-center justify-content-between py-3">
+            <div class="d-flex align-items-center">
+                <div class="cb-logo me-2">CB</div>
+                <div class="cb-brand">
+                    <div class="cb-title">ConsentBridge</div>
+                    <div class="cb-sub">Candidate Portal</div>
+                </div>
+            </div>
+            <nav>
+                <a class="cb-nav" asp-page="/Index">Home</a>
+                <a class="cb-nav" asp-page="/Login">Login</a>
+            </nav>
+        </div>
+    </header>
+    <div class="container py-4">
+        <main role="main" class="pb-3">
+            @RenderBody()
+        </main>
+    </div>
+
+    <footer class="cb-footer">
+        <div class="container">
+            <span>&copy; 2025 • ConsentBridge</span>
+        </div>
+    </footer>
+
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

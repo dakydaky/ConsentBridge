@@ -38,6 +38,7 @@ services:
       ConnectionStrings__Default: Host=postgres;Port=5432;Database=gateway;Username=gateway;Password=devpass
       ASPNETCORE_ENVIRONMENT: Development
       MOCKBOARD_URL: http://mockboard:8081
+      AGENT_WEBHOOK_URL: http://agentconsole:8082/webhooks/consent
     ports: ["8080:8080"]
     volumes:
       - gateway_dataprotection:/app/dataprotection
@@ -74,6 +75,24 @@ services:
       Gateway__AgentTenantId: agent_acme
       Gateway__BoardTenantId: mockboard_eu
     ports: ["8082:8082"]
+
+  candidateportal:
+    build:
+      context: .
+      dockerfile: src/Candidate.Portal/Dockerfile
+    depends_on:
+      gateway:
+        condition: service_started
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Gateway__BaseUrl: http://gateway:8080
+      Gateway__OAuth__TokenEndpoint: /oauth/token
+      Gateway__OAuth__ClientId: agent_acme_client
+      Gateway__OAuth__ClientSecret: agent-secret
+      Gateway__OAuth__Scope: apply.submit
+      Gateway__AgentTenantId: agent_acme
+      Gateway__BoardTenantId: mockboard_eu
+    ports: ["8083:8083"]
 
 
 

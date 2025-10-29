@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
-namespace MockAgent.ConsoleApp.Pages.Frontpage;
+namespace Candidate.PortalApp.Pages;
 
 public class LoginModel : PageModel
 {
@@ -18,7 +18,7 @@ public class LoginModel : PageModel
     {
         if (!ModelState.IsValid) return Page();
         HttpContext.Session.SetString("CandidateEmail", Email.Trim().ToLowerInvariant());
-        return RedirectToPage("/Frontpage/Index");
+        return RedirectToPage("/Index");
     }
 }
 
