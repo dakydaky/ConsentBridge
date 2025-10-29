@@ -1,5 +1,5 @@
 # ConsentBridge MVP Roadmap
-_Last refreshed: 2025-10-28_
+_Last refreshed: 2025-10-29_
 
 **Legend:** ✅ delivered · 🚧 in progress · ⏳ queued · 🧭 requires ADR decision
 
@@ -14,20 +14,21 @@ _Last refreshed: 2025-10-28_
   - ✅ Follow-ups delivered: audit events, operator docs, and lifecycle metrics.
 - ⏳ **Agent & board scope management UX** — surface scopes and authorization messaging inside the consent flow.
 - ⏳ **OTP throttling & lockout rules** — rate-limit verification attempts and capture audit events.
+  - 🧭 Rate-limit policy and UX messaging to be decided.
 
 ## 2. Data Protection & Compliance
 - ✅ **Retention sweeps** — automated removal of aged consent requests and receipt payloads with configurable windows.
 - ✅ **DSR endpoints** — export/delete APIs online; SLA tracking remains to be wired up.
 - ⏳ **Retention SLA instrumentation** — metrics and alerts to prove sweeps run within policy windows.
-- 🚧 **Immutable audit trail tables** — schema in place; lifecycle + token‑grace events emitted; verification service + admin endpoints; background verifier + daily digest export; broadened emission (consent issuance/denial/revocation, application created/accepted/failed, receipt verify/fail, key rotation).
-  - ⏳ Next: DB role hardening (GRANT/REVOKE in deploy scripts), WORM digest off‑cluster policy, DSR export wiring for audit entries.
+- 🚧 **Immutable audit trail tables** — schema in place; lifecycle + token‑grace events emitted; verification service + admin endpoints; background verifier + daily digest export; broadened emission (consent issuance/denial/revocation, application created/accepted/failed, receipt verify/fail, key rotation); DSR export includes audit entries.
+  - 🚧 Next: DB role hardening rollout (apply `scripts/db/secure-audit.sql` GRANT/REVOKE in deploy), finalize WORM/off‑cluster digest storage policy (object storage), add integrity failure alerting.
 - ⏳ **PII field-level encryption strategy** — implement `candidate.pii_enc` handling aligned to spec guidance.
 - ⏳ **DSR export packaging** — deliver signed archive responses and documented operator flow.
 
 ## 3. Platform Hardening & Ops
-- ⏳ **Integration & regression tests** — add coverage for consent issuance, application flow, adapter error paths, and signature failure handling.
+- 🚧 **Integration & regression tests** — unit coverage increased (lifecycle, verifier). Add end‑to‑end tests for application grace path and audit emission.
 - ⏳ **Load-test harness** — scripted consent/application submissions with configurable tenant mix.
-- ⏳ **Structured logging & correlation IDs** — Serilog enrichers, trace IDs, and request-scoped metadata.
+- 🚧 **Structured logging & correlation IDs** — audit metadata carries correlation IDs (X‑Correlation‑ID/TraceIdentifier). Add Serilog enrichers and request logging.
 - ⏳ **Health & readiness probes** — ASP.NET health checks plus container compose wiring.
 - ⏳ **Metrics / OpenTelemetry bridge** — emit gateway and adapter telemetry to OTel collectors.
 - ⏳ **Centralised secret management** — externalise connection strings, JWKS endpoints, and tenant keys via env/secret stores.
@@ -35,11 +36,12 @@ _Last refreshed: 2025-10-28_
 
 ## 4. Data Layer & Migrations
 - ✅ **EF migrations scaffolded** — baseline migration committed alongside tooling.
-- ⏳ **Formal migration pipeline** — ensure `dotnet ef database update` runs on container startup.
+- 🚧 **Formal migration pipeline** — app performs startup migration; add CI/CD migration step and rollback playbook.
 - ⏳ **Seed scripts for demo tenants** — scripted identities, keys, and sample payloads for demo environments.
 - ⏳ **Migration rollback playbook** — define down-migrations, backups, and recovery steps.
 
 ## 5. Ecosystem & Delivery
+- ✅ **CI test reporting** — GitHub Actions publishes TRX results, artifacts, and PR summaries.
 - ⏳ **Gateway .NET SDK** — ship HTTP client, signing helpers, usage samples, and NuGet packaging.
 - ⏳ **Language-agnostic quickstarts** — publish Node/Python examples covering consent issuance and application submission.
 - ⏳ **Deployment assets** — replace placeholder manifests with Helm/K8s charts and CI pipeline definitions.
