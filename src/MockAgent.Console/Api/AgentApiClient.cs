@@ -86,5 +86,34 @@ public class AgentApiClient
         public DateTimeOffset obtained_at { get; set; }
         public bool IsValid => !string.IsNullOrEmpty(access_token) && obtained_at.AddSeconds(expires_in - 30) > DateTimeOffset.UtcNow;
     }
-}
 
+    public async Task<IReadOnlyList<ConsentView>> GetConsentsAsync(int? take = null, CancellationToken ct = default)
+    {
+        await EnsureTokenAsync(ct);
+        var url = "/v1/consents" + (take.HasValue ? $"?take={take.Value}" : string.Empty);
+        using var req = new HttpRequestMessage(HttpMethod.Get, url);
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _cachedToken!.access_token);
+        var res = await _http.SendAsync(req, ct);
+        res.EnsureSuccessStatusCode();
+        await using var stream = await res.Content.ReadAsStreamAsync(ct);
+        var consents = await JsonSerializer.DeserializeAsync<List<ConsentView>>(stream, JsonOpts, ct) ?? new();
+        return consents;
+    }
+
+    public sealed record ConsentView(
+        Guid Id,
+        string AgentTenantId,
+        string BoardTenantId,
+        string? ApprovedByEmail,
+        IReadOnlyList<string> Scopes,
+        string Status,
+        DateTime IssuedAt,
+        DateTime ExpiresAt,
+        DateTime TokenIssuedAt,
+        DateTime TokenExpiresAt,
+        Guid TokenId,
+        string? TokenKeyId,
+        string? TokenAlgorithm,
+        DateTime? RevokedAt
+    );
+}

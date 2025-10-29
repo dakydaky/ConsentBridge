@@ -8,6 +8,13 @@
 
 <form method="post">
     <div class="mb-3">
+        <label class="form-label">Consent</label>
+        <select class="form-select" asp-for="SelectedConsentId" asp-items="Model.ConsentOptions">
+            <option value="">-- Select approved consent --</option>
+        </select>
+        <div class="form-text">Prefills token as ctok:{tokenId} and candidate email if selected.</div>
+    </div>
+    <div class="mb-3">
         <label class="form-label">Candidate Email</label>
         <input class="form-control" asp-for="CandidateEmail" />
         <span class="text-danger" asp-validation-for="CandidateEmail"></span>
@@ -17,9 +24,9 @@
         <input class="form-control" asp-for="JobRef" />
     </div>
     <div class="mb-3">
-        <label class="form-label">Consent Token (paste from candidate approval)</label>
+        <label class="form-label">Consent Token</label>
         <textarea class="form-control" asp-for="ConsentToken" rows="3"></textarea>
-        <span class="text-muted">Paste the JWT shown on the Consent success screen.</span>
+        <span class="text-muted">Autofilled from selection as ctok:{tokenId}. You can paste a JWT to override.</span>
     </div>
     <div class="mb-3">
         <label class="form-label">Cover Letter</label>
@@ -36,4 +43,3 @@
         <code>@Model.ResultSnippet</code>
     </div>
 }
-
