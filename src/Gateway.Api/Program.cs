@@ -347,6 +347,50 @@ app.MapPost("/v1/consent-requests", async (
     });
 }).RequireAuthorization("apply.submit");
 
+app.MapGet("/v1/consent-requests", async (
+    ClaimsPrincipal user,
+    [FromQuery] string? email,
+    [FromQuery] string? status,
+    [FromQuery] int? take,
+    GatewayDbContext db) =>
+{
+    var (tenantSlug, tenantType) = AuthHelpers.GetTenantContext(user);
+    if (tenantSlug is null || tenantType != TenantType.Agent)
+    {
+        return Results.Forbid();
+    }
+
+    var query = db.ConsentRequests.AsNoTracking()
+        .Where(r => r.AgentTenantId == tenantSlug);
+    if (!string.IsNullOrWhiteSpace(email))
+    {
+        var em = email.Trim().ToLower();
+        query = query.Where(r => r.CandidateEmail == em);
+    }
+    if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<ConsentRequestStatus>(status, true, out var parsed))
+    {
+        query = query.Where(r => r.Status == parsed);
+    }
+    var size = Math.Clamp(take ?? 50, 1, 200);
+    var rows = await query
+        .OrderByDescending(r => r.CreatedAt)
+        .Take(size)
+        .Select(r => new
+        {
+            r.Id,
+            r.CandidateEmail,
+            r.Status,
+            r.CreatedAt,
+            r.ExpiresAt,
+            r.DecisionAt,
+            r.VerifiedAt,
+            consent_id = r.ConsentId,
+            link = $"/consent/{r.Id}"
+        })
+        .ToListAsync();
+    return Results.Ok(rows);
+}).RequireAuthorization("apply.submit");
+
 app.MapGet("/v1/consents", async (
     ClaimsPrincipal user,
     [FromQuery] int? take,

@@ -9,6 +9,7 @@ builder.Services.AddHttpClient();
 builder.Services.Configure<GatewayOptions>(builder.Configuration.GetSection("Gateway"));
 builder.Services.AddSingleton<DemoState>();
 builder.Services.AddScoped<AgentApiClient>();
+builder.Services.AddSession();
 
 var app = builder.Build();
 
@@ -22,6 +23,7 @@ app.UseRouting();
 
 app.UseAuthorization();
 
+app.UseSession();
 app.MapStaticAssets();
 app.MapRazorPages()
    .WithStaticAssets();

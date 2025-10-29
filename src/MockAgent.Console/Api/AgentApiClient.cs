@@ -141,4 +141,33 @@ public class AgentApiClient
         string? TokenAlgorithm,
         DateTime? RevokedAt
     );
+
+    public async Task<IReadOnlyList<ConsentRequestView>> GetConsentRequestsAsync(string? email = null, string? status = null, int? take = null, CancellationToken ct = default)
+    {
+        await EnsureTokenAsync(ct);
+        var qs = new List<string>();
+        if (!string.IsNullOrWhiteSpace(email)) qs.Add($"email={Uri.EscapeDataString(email)}");
+        if (!string.IsNullOrWhiteSpace(status)) qs.Add($"status={Uri.EscapeDataString(status)}");
+        if (take.HasValue) qs.Add($"take={take.Value}");
+        var url = "/v1/consent-requests" + (qs.Count > 0 ? ("?" + string.Join('&', qs)) : string.Empty);
+        using var req = new HttpRequestMessage(HttpMethod.Get, url);
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _cachedToken!.access_token);
+        var res = await _http.SendAsync(req, ct);
+        res.EnsureSuccessStatusCode();
+        await using var stream = await res.Content.ReadAsStreamAsync(ct);
+        var rows = await JsonSerializer.DeserializeAsync<List<ConsentRequestView>>(stream, JsonOpts, ct) ?? new();
+        return rows;
+    }
+
+    public sealed record ConsentRequestView(
+        Guid Id,
+        string CandidateEmail,
+        string Status,
+        DateTime CreatedAt,
+        DateTime ExpiresAt,
+        DateTime? DecisionAt,
+        DateTime? VerifiedAt,
+        Guid? consent_id,
+        string link
+    );
 }

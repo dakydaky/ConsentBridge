@@ -28,8 +28,20 @@ public class IndexModel : PageModel
     public string JobRef { get; set; } = string.Empty;
 
     public string? ConsentLink { get; set; }
+    public string? LoggedInEmail { get; set; }
+    public List<AgentApiClient.ConsentRequestView>? MyPending { get; set; }
+    public List<AgentApiClient.ConsentView>? MyConsents { get; set; }
+    public string GatewayBaseUrl => _opts.BaseUrl?.TrimEnd('/') ?? "";
 
-    public void OnGet() { }
+    public async Task OnGet()
+    {
+        LoggedInEmail = HttpContext.Session.GetString("CandidateEmail");
+        if (!string.IsNullOrWhiteSpace(LoggedInEmail))
+        {
+            MyPending = (await _api.GetConsentRequestsAsync(email: LoggedInEmail, take: 50)).ToList();
+            MyConsents = (await _api.GetConsentsAsync(50)).Where(c => string.Equals(c.ApprovedByEmail, LoggedInEmail, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+    }
 
     public async Task<IActionResult> OnPostAsync()
     {
@@ -38,7 +50,12 @@ public class IndexModel : PageModel
         var requestId = await _api.CreateConsentRequestAsync(Email);
         _state.AddCandidate(new CandidateItem(Email, JobRef, DateTimeOffset.UtcNow));
         ConsentLink = $"{_opts.BaseUrl}/consent/{requestId}";
-        return Page();
+        return RedirectToPage();
+    }
+
+    public IActionResult OnGetLogout()
+    {
+        HttpContext.Session.Remove("CandidateEmail");
+        return RedirectToPage();
     }
 }
-
