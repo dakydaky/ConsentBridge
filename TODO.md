@@ -59,3 +59,21 @@ _Last refreshed: 2025-10-29_
 - ⏳ **Threat model refresh** — update STRIDE analysis for consent issuance and board adapters.
 - ⏳ **Key rotation playbook** — automation and runbook for updating tenant JWKS material.
 - ⏳ **Pen-test readiness checklist** — logging, alerting, and break-glass access controls.
+
+Product feedback on your spec (C#/.NET 9 build):
+
+Great calls: per-tenant JWKS; detached-JWS; signed receipts; DSR endpoints; minimal, pragmatic API surface.
+
+I’d add:
+
+Receipt schema: include hash of full ApplyPayload, ATS job reference, and verification URL for recruiters.
+
+Consent scopes: add apply.read, apply.status, and materials.write granularity; support expiry + audience binding.
+
+Event webhooks: consent.revoked, application.receipt.created, dsr.export.ready.
+
+UMA-style artifacts: even if you don’t implement full UMA, mirror terms (resource owner, RPT, permission ticket) to ease comprehension. 
+docs.kantarainitiative.org
+
+EUDI readiness: an extension point for receiving a Verifiable Presentation proving control of email/identity/credentials (e.g., education certs). 
+EUDI Wallet Dev Hub
