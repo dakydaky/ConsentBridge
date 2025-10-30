@@ -82,15 +82,15 @@ public sealed class JwtConsentTokenFactory : IConsentTokenFactory, IConsentKeyRo
 
     public ConsentTokenIssueResult IssueToken(Consent consent, Candidate candidate)
     {
-        if (consent is null) throw new ArgumentNullException(nameof(consent));
-        if (candidate is null) throw new ArgumentNullException(nameof(candidate));
+        ArgumentNullException.ThrowIfNull(consent);
+        ArgumentNullException.ThrowIfNull(candidate);
 
         var now = DateTime.UtcNow;
         var tenant = _db.Tenants.FirstOrDefault(t => t.Slug == consent.AgentTenantId)
             ?? throw new InvalidOperationException($"Tenant {consent.AgentTenantId} not found when issuing consent token.");
 
         var signingKey = EnsureActiveKey(tenant, now);
-        using var ecdsa = CreateEcdsa(signingKey);
+        var ecdsa = CreateEcdsa(signingKey);
         signingKey.LastUsedAt = now;
 
         var jti = Guid.NewGuid();

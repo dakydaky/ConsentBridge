@@ -543,7 +543,8 @@ app.MapPost("/v1/applications", async (
     {
         return Results.BadRequest(new { error = "missing_signature" });
     }
-    if (string.IsNullOrWhiteSpace(payload.ConsentToken)) {
+    if (string.IsNullOrWhiteSpace(payload.ConsentToken))
+    {
         return Results.Unauthorized();
     }
 
@@ -584,7 +585,10 @@ app.MapPost("/v1/applications", async (
     }
     else
     {
-        var handler = new JwtSecurityTokenHandler();
+        var handler = new JwtSecurityTokenHandler
+        {
+            MapInboundClaims = false // prevent sub -> nameidentifier mapping
+        };
         JwtSecurityToken jwtToken;
         try
         {
@@ -1101,7 +1105,7 @@ string ComputeConsentTokenHash(string token)
 }
 
 
- 
+
 
 
 
