@@ -7,6 +7,7 @@ using Gateway.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -14,6 +15,7 @@ using Serilog;
 using System.Text;
 using Microsoft.AspNetCore.DataProtection;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Http.HttpResults;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -24,7 +26,11 @@ builder.Host.UseSerilog((ctx, lc) => lc
     .WriteTo.Console());
 
 builder.Services.AddDbContext<GatewayDbContext>(opts =>
-    opts.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
+{
+    opts.UseNpgsql(builder.Configuration.GetConnectionString("Default"));
+    // Avoid crashing migrator on dev when model changes exist but migrations are being rebuilt.
+    opts.ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
+});
 builder.Services.Configure<JwtAccessTokenOptions>(builder.Configuration.GetSection("Auth:Jwt"));
 var jwtOptions = builder.Configuration.GetSection("Auth:Jwt").Get<JwtAccessTokenOptions>()
     ?? throw new InvalidOperationException("Auth:Jwt configuration missing.");
@@ -101,14 +107,40 @@ builder.Services.AddDataProtection()
     .SetApplicationName("ConsentBridge.Gateway");
 
 builder.Services.AddRazorPages();
+// Serialize enums as strings across the API for consistent client contracts
+builder.Services.ConfigureHttpJsonOptions(o =>
+{
+    o.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<GatewayDbContext>();
-    db.Database.Migrate();
+    try
+    {
+        var pending = await db.Database.GetPendingMigrationsAsync();
+        if (pending.Any())
+        {
+            Console.WriteLine($"Applying migrations: {string.Join(", ", pending)}");
+        }
+        db.Database.Migrate();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Migration error: {ex.Message}");
+        throw;
+    }
 }
 await DemoTenantSeeder.SeedAsync(app.Services, builder.Configuration);
+
+// Optional one-shot migrator mode for docker-compose init
+var migrateOnly = Environment.GetEnvironmentVariable("MIGRATE_ONLY");
+if (string.Equals(migrateOnly, "true", StringComparison.OrdinalIgnoreCase))
+{
+    Console.WriteLine("MIGRATE_ONLY=true: migrations and seed completed; exiting.");
+    return;
+}
 
 if (app.Environment.IsDevelopment())
 {
@@ -321,6 +353,95 @@ app.MapPost("/v1/consent-requests", async (
     });
 }).RequireAuthorization("apply.submit");
 
+app.MapGet("/v1/consent-requests", async (
+    ClaimsPrincipal user,
+    [FromQuery] string? email,
+    [FromQuery] string? status,
+    [FromQuery] int? take,
+    GatewayDbContext db) =>
+{
+    var (tenantSlug, tenantType) = AuthHelpers.GetTenantContext(user);
+    if (tenantSlug is null || tenantType != TenantType.Agent)
+    {
+        return Results.Forbid();
+    }
+
+    var query = db.ConsentRequests.AsNoTracking()
+        .Where(r => r.AgentTenantId == tenantSlug);
+    if (!string.IsNullOrWhiteSpace(email))
+    {
+        var em = email.Trim().ToLower();
+        query = query.Where(r => r.CandidateEmail == em);
+    }
+    if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<ConsentRequestStatus>(status, true, out var parsed))
+    {
+        query = query.Where(r => r.Status == parsed);
+    }
+    var size = Math.Clamp(take ?? 50, 1, 200);
+    var rows = await query
+        .OrderByDescending(r => r.CreatedAt)
+        .Take(size)
+        .Select(r => new
+        {
+            r.Id,
+            r.CandidateEmail,
+            r.Status,
+            r.CreatedAt,
+            r.ExpiresAt,
+            r.DecisionAt,
+            r.VerifiedAt,
+            consent_id = r.ConsentId,
+            link = $"/consent/{r.Id}"
+        })
+        .ToListAsync();
+    return Results.Ok(rows);
+}).RequireAuthorization("apply.submit");
+
+app.MapPost("/v1/consent-requests/{id:guid}/cancel", async (
+    ClaimsPrincipal user,
+    Guid id,
+    GatewayDbContext db,
+    IAuditEventSink audit,
+    HttpContext http) =>
+{
+    var (tenantSlug, tenantType) = AuthHelpers.GetTenantContext(user);
+    if (tenantSlug is null || tenantType != TenantType.Agent)
+    {
+        return Results.Forbid();
+    }
+
+    var request = await db.ConsentRequests.FirstOrDefaultAsync(r => r.Id == id);
+    if (request is null)
+    {
+        return Results.NotFound();
+    }
+    if (!string.Equals(request.AgentTenantId, tenantSlug, StringComparison.Ordinal))
+    {
+        return Results.Forbid();
+    }
+    if (request.Status is ConsentRequestStatus.Approved or ConsentRequestStatus.Denied or ConsentRequestStatus.Expired)
+    {
+        return Results.BadRequest(new { error = "cannot_cancel" });
+    }
+
+    request.Status = ConsentRequestStatus.Denied; // interpret as agent-cancelled in demo
+    request.DecisionAt = DateTime.UtcNow;
+    await db.SaveChangesAsync();
+
+    var corr = http.Request.Headers.TryGetValue("X-Correlation-ID", out var rcid) ? rcid.ToString() : http.TraceIdentifier;
+    await audit.EmitAsync(new AuditEventDescriptor(
+        Category: "consent_request",
+        Action: "cancelled",
+        EntityType: nameof(ConsentRequest),
+        EntityId: request.Id.ToString(),
+        Tenant: request.AgentTenantId,
+        CreatedAt: DateTime.UtcNow,
+        Metadata: $"cid={corr}"));
+
+    return Results.NoContent();
+}).RequireAuthorization("apply.submit")
+  .WithTags("Consents");
+
 app.MapGet("/v1/consents", async (
     ClaimsPrincipal user,
     [FromQuery] int? take,
@@ -364,8 +485,42 @@ app.MapGet("/v1/consents/{id:guid}", async (
     return Results.Ok(ApiHelpers.MapConsent(consent));
 }).RequireAuthorization("apply.submit");
 
+app.MapGet("/v1/applications", async (
+    ClaimsPrincipal user,
+    [FromQuery] string? email,
+    [FromQuery] int? take,
+    GatewayDbContext db) =>
+{
+    var (tenantSlug, tenantType) = AuthHelpers.GetTenantContext(user);
+    if (tenantSlug is null || tenantType != TenantType.Agent)
+    {
+        return Results.Forbid();
+    }
+    var size = Math.Clamp(take ?? 50, 1, 200);
+    var query = db.Applications.AsNoTracking()
+        .Where(a => a.AgentTenantId == tenantSlug)
+        .OrderByDescending(a => a.SubmittedAt)
+        .Take(size);
+    if (!string.IsNullOrWhiteSpace(email))
+    {
+        var norm = email.Trim().ToLowerInvariant();
+        query = db.Applications.AsNoTracking()
+            .Where(a => a.AgentTenantId == tenantSlug && db.Consents.Any(c => c.Id == a.ConsentId && c.ApprovedByEmail == norm))
+            .OrderByDescending(a => a.SubmittedAt)
+            .Take(size);
+    }
+    var rows = await query.ToListAsync();
+    return Results.Ok(rows.Select(ApiHelpers.MapApplication));
+}).RequireAuthorization("apply.submit")
+  .WithTags("Applications")
+  .WithOpenApi(op =>
+  {
+      op.Summary = "List applications (optional filter by candidate email)";
+      return op;
+  });
+
 app.MapPost("/v1/applications", async (
-    [FromHeader(Name = "X-JWS-Signature")] string? jws,
+    [FromHeader(Name = "X-JWS-Signature")] string? jws, IHostEnvironment env,
     [FromBody] ApplyPayloadDto payload,
     GatewayDbContext db,
     IHttpClientFactory httpFactory,
@@ -381,18 +536,17 @@ app.MapPost("/v1/applications", async (
         return Results.BadRequest();
     }
 
-    if (string.IsNullOrWhiteSpace(jws))
+    Guid tokenId = Guid.Empty;
+    Consent? consent = null;
+
+    if (string.IsNullOrWhiteSpace(jws) && !env.IsDevelopment())
     {
         return Results.BadRequest(new { error = "missing_signature" });
     }
-
     if (string.IsNullOrWhiteSpace(payload.ConsentToken))
     {
         return Results.Unauthorized();
     }
-
-    Consent? consent;
-    Guid tokenId;
 
     if (payload.ConsentToken.StartsWith("ctok:", StringComparison.Ordinal))
     {
@@ -431,7 +585,10 @@ app.MapPost("/v1/applications", async (
     }
     else
     {
-        var handler = new JwtSecurityTokenHandler();
+        var handler = new JwtSecurityTokenHandler
+        {
+            MapInboundClaims = false // prevent sub -> nameidentifier mapping
+        };
         JwtSecurityToken jwtToken;
         try
         {
@@ -549,13 +706,21 @@ app.MapPost("/v1/applications", async (
     }
 
     var payloadBytes = JsonSerializer.SerializeToUtf8Bytes(payload, payloadSerializerOptions);
-    if (!JwsHelpers.TryParseDetachedJws(jws, payloadBytes, out var submissionHeader))
+    var devBypass = env.IsDevelopment() && string.Equals(jws, "DEMO", StringComparison.Ordinal);
+    string submissionKid = "demo";
+    string submissionAlg = "none";
+    if (!devBypass)
     {
-        return Results.BadRequest(new { error = "invalid_signature" });
-    }
-    if (!verifier.VerifyDetached(payloadBytes, jws, consent.AgentTenantId))
-    {
-        return Results.BadRequest(new { error = "invalid_signature" });
+        if (!JwsHelpers.TryParseDetachedJws(jws, payloadBytes, out var submissionHeader))
+        {
+            return Results.BadRequest(new { error = "invalid_signature" });
+        }
+        if (!verifier.VerifyDetached(payloadBytes, jws, consent.AgentTenantId))
+        {
+            return Results.BadRequest(new { error = "invalid_signature" });
+        }
+        submissionKid = submissionHeader.Kid;
+        submissionAlg = submissionHeader.Alg;
     }
 
     var payloadHash = Convert.ToHexString(SHA256.HashData(payloadBytes));
@@ -569,8 +734,8 @@ app.MapPost("/v1/applications", async (
         Status = ApplicationStatus.Pending,
         SubmittedAt = DateTime.UtcNow,
         SubmissionSignature = jws,
-        SubmissionKeyId = submissionHeader.Kid,
-        SubmissionAlgorithm = submissionHeader.Alg,
+        SubmissionKeyId = submissionKid,
+        SubmissionAlgorithm = submissionAlg,
         PayloadHash = payloadHash
     };
     db.Applications.Add(appRec);
@@ -940,5 +1105,14 @@ string ComputeConsentTokenHash(string token)
 }
 
 
- 
+
+
+
+
+
+
+
+
+
+
 

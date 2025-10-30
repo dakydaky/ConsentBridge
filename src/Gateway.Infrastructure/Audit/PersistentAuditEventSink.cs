@@ -55,7 +55,10 @@ public sealed class PersistentAuditEventSink : IAuditEventSink
             CreatedAt = audit.CreatedAt
         };
 
+        // Persist the principal first to satisfy FK ordering regardless of model config
         _db.AuditEvents.Add(audit);
+        await _db.SaveChangesAsync(cancellationToken);
+
         _db.AuditEventHashes.Add(link);
         await _db.SaveChangesAsync(cancellationToken);
     }

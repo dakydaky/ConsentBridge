@@ -12,19 +12,23 @@ public class ApproveModel : PageModel
     private readonly IConsentTokenFactory _tokenFactory;
     private readonly ILogger<ApproveModel> _logger;
     private readonly IAuditEventSink _audit;
+    private readonly IHttpClientFactory _httpClientFactory;
 
-    public ApproveModel(GatewayDbContext db, IConsentTokenFactory tokenFactory, ILogger<ApproveModel> logger, IAuditEventSink audit)
+    public ApproveModel(GatewayDbContext db, IConsentTokenFactory tokenFactory, ILogger<ApproveModel> logger, IAuditEventSink audit, IHttpClientFactory httpClientFactory)
     {
         _db = db;
         _tokenFactory = tokenFactory;
         _logger = logger;
         _audit = audit;
+        _httpClientFactory = httpClientFactory;
     }
 
     public ConsentRequest? RequestEntity { get; private set; }
     public string[] ScopeList { get; private set; } = Array.Empty<string>();
     public string? ErrorMessage { get; private set; }
     public string? InfoMessage { get; private set; }
+    public string AgentName { get; private set; } = string.Empty;
+    public string BoardName { get; private set; } = string.Empty;
 
     public async Task<IActionResult> OnGetAsync(Guid id)
     {
@@ -145,6 +149,34 @@ public class ApproveModel : PageModel
         TempData["ConsentStatus"] = "approved";
         TempData["ConsentToken"] = issued.Token;
         TempData["ConsentExpires"] = issued.ExpiresAt.ToString("O");
+
+        // Dev-only webhook to agent console if configured
+        try
+        {
+            var agentTenant = await _db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == RequestEntity.AgentTenantId);
+            var callback = agentTenant?.CallbackUrl ?? Environment.GetEnvironmentVariable("AGENT_WEBHOOK_URL");
+            if (!string.IsNullOrWhiteSpace(callback))
+            {
+                var payload = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    type = "consent.issued",
+                    consent_id = consent.Id,
+                    token_id = consent.TokenId,
+                    candidate_email = consent.ApprovedByEmail,
+                    issued_at = consent.TokenIssuedAt,
+                    expires_at = consent.TokenExpiresAt,
+                    agent = consent.AgentTenantId,
+                    board = consent.BoardTenantId
+                }, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+                var client = _httpClientFactory.CreateClient();
+                var res = await client.PostAsync(callback!, new StringContent(payload, System.Text.Encoding.UTF8, "application/json"));
+                _logger.LogInformation("Webhook sent to {Callback} with status {Status}", callback, res.StatusCode);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Webhook dispatch failed");
+        }
         return RedirectToPage("Complete", new { id });
     }
 
@@ -156,5 +188,13 @@ public class ApproveModel : PageModel
 
         ScopeList = RequestEntity?.Scopes?.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                     ?? Array.Empty<string>();
+
+        if (RequestEntity is not null)
+        {
+            var agent = await _db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == RequestEntity.AgentTenantId);
+            var board = await _db.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Slug == RequestEntity.BoardTenantId);
+            AgentName = agent?.DisplayName ?? RequestEntity.AgentTenantId;
+            BoardName = board?.DisplayName ?? RequestEntity.BoardTenantId;
+        }
     }
 }

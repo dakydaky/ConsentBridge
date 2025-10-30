@@ -1,0 +1,68 @@
+@page
+@model Candidate.PortalApp.Pages.IndexModel
+@{
+    ViewData["Title"] = "ConsentBridge – Candidate";
+}
+
+<div class="text-center mb-4">
+  <h2>AgentX · Candidate Portal</h2>
+  <p class="text-muted">Authorize your agent to apply on your behalf across jobs.</p>
+  <p class="text-muted">You can revoke or renew this consent anytime.</p>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.LoggedInEmail)) {
+  <div class="alert alert-success">Logged in as <strong>@Model.LoggedInEmail</strong> · <a asp-page-handler="Logout">Logout</a></div>
+} else {
+  <div class="alert alert-info">Please <a asp-page="/Login">log in</a> to continue.</div>
+}
+
+@if (!string.IsNullOrEmpty(Model.LoggedInEmail)) {
+  <div class="card mb-3">
+    <div class="card-body">
+      <h5 class="card-title">Start consent</h5>
+      <form method="post">
+        <button type="submit" class="btn btn-primary">Create Consent Request</button>
+        @if (!string.IsNullOrEmpty(Model.ConsentLink)) {
+          <a class="btn btn-outline-secondary ms-2" href="@Model.ConsentLink" target="_blank">Open Consent</a>
+        }
+      </form>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-6">
+      <h5>Pending Requests</h5>
+      <ul>
+        @foreach (var r in Model.MyPending) {
+          <li>@r.CreatedAt.ToLocalTime(): @r.Status · <a href="@Model.PublicBaseUrl@r.link" target="_blank">Open</a></li>
+        }
+      </ul>
+    </div>
+    <div class="col-md-6">
+      <h5>Active Consents</h5>
+      <ul>
+        @foreach (var c in Model.MyConsents) {
+          <li>ctok:@c.TokenId · exp @c.TokenExpiresAt.ToLocalTime() · <form method="post" asp-page-handler="Revoke" asp-route-id="@c.Id" class="d-inline"><button class="btn btn-sm btn-outline-danger">Revoke</button></form></li>
+        }
+      </ul>
+    </div>
+  </div>
+
+  <div class="mt-4">
+    <h5>My Applications</h5>
+    <table class="table table-sm">
+      <thead><tr><th>ID</th><th>Board</th><th>Status</th><th>Submitted</th><th>Receipt</th></tr></thead>
+      <tbody>
+      @foreach (var a in Model.MyApplications) {
+        <tr>
+          <td><code>@a.Id</code></td>
+          <td>@a.BoardTenantId</td>
+          <td>@a.Status</td>
+          <td>@a.SubmittedAt.ToLocalTime()</td>
+          <td>@(string.IsNullOrEmpty(a.Receipt) ? "—" : "Available")</td>
+        </tr>
+      }
+      </tbody>
+    </table>
+  </div>
+}

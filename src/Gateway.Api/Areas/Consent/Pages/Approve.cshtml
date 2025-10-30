@@ -8,10 +8,10 @@
     Review requested scopes
 </div>
 
-<h1>Allow agent access?</h1>
+<h1>Allow @Model.AgentName to apply?</h1>
 <p>
-    <strong>@Model.RequestEntity?.AgentTenantId</strong> wants to apply on your behalf to
-    <strong>@Model.RequestEntity?.BoardTenantId</strong>.
+    <strong>@Model.AgentName</strong> wants to apply on your behalf to
+    <strong>@Model.BoardName</strong>.
 </p>
 
 @if (!string.IsNullOrEmpty(Model.InfoMessage))

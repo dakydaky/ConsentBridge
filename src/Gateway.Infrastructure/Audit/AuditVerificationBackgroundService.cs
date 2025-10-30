@@ -66,6 +66,18 @@ public sealed class AuditVerificationBackgroundService : BackgroundService
         var db = scope.ServiceProvider.GetRequiredService<GatewayDbContext>();
         var verifier = scope.ServiceProvider.GetRequiredService<IAuditVerifier>();
 
+        // Gracefully bail out if audit tables are not created yet (fresh env before migrations)
+        try
+        {
+            // Lightweight existence probe; avoid materializing data
+            _ = await db.AuditEventHashes.AsNoTracking().Select(x => x.EventId).FirstOrDefaultAsync(cancellationToken);
+        }
+        catch (Exception ex) when (IsMissingRelation(ex))
+        {
+            _logger.LogWarning("Audit tables not found yet; skipping verification sweep until migrations complete.");
+            return;
+        }
+
         var tenants = await db.Tenants.AsNoTracking()
             .Select(t => t.Slug)
             .ToListAsync(cancellationToken);
@@ -95,6 +107,22 @@ public sealed class AuditVerificationBackgroundService : BackgroundService
                 GatewayMetrics.AuditVerificationFailed.Add(1, new KeyValuePair<string, object?>("tenant", slug));
             }
         }
+    }
+
+    private static bool IsMissingRelation(Exception ex)
+    {
+        // Detect Postgres missing-table errors (42P01) even when wrapped
+        while (ex != null)
+        {
+            if (ex.GetType().FullName == "Npgsql.PostgresException")
+            {
+                var sqlStateProp = ex.GetType().GetProperty("SqlState");
+                var sqlState = sqlStateProp?.GetValue(ex)?.ToString();
+                if (string.Equals(sqlState, "42P01", StringComparison.Ordinal)) return true;
+            }
+            ex = ex.InnerException!;
+        }
+        return false;
     }
 
     private async Task WriteDigestAsync(AuditVerificationResult result, CancellationToken cancellationToken)

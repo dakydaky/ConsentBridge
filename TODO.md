@@ -60,6 +60,15 @@ _Last refreshed: 2025-10-29_
 - ⏳ **Key rotation playbook** — automation and runbook for updating tenant JWKS material.
 - ⏳ **Pen-test readiness checklist** — logging, alerting, and break-glass access controls.
 
+## 8. Investor Demo (E2E Perspectives)
+- ⏳ **Mock Agent Console (Razor)** — lightweight UI to represent the agent perspective without Swagger. MVP screens: Dashboard, Request Consent, Submit Application, Application Detail, Consent Detail. See `docs/ux/mock-agent-console.md`.
+  - Acceptance: End-to-end demo runs using Consent Web + Mock Agent Console + MockBoard dashboard with no CLI/Swagger on screen.
+- ⏳ **Runbook & user journeys** — add non-developer docs to drive the demo: `docs/ux/investor-demo-runbook.md`, `docs/ux/user-journeys.md`.
+  - Acceptance: Investor can follow the storyboard to see Candidate → Agent → Board → Audit flows.
+- ⏳ **Demo data seeding** — script or configure sample candidates/jobs consistent with runbook (Alice, ACME, MockBoard EU, job `mock:98765`).
+  - Acceptance: Single `make demo-seed` or `./demo.ps1 -Seed` prepares environment.
+- ⏳ **Audit verification snapshot** — prepare a success screenshot or minimal UI showing a verified audit window per ADR 0003.
+  - Acceptance: Integrity proof is demonstrable without terminal output.
 Product feedback on your spec (C#/.NET 9 build):
 
 Great calls: per-tenant JWKS; detached-JWS; signed receipts; DSR endpoints; minimal, pragmatic API surface.
